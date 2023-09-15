@@ -75,58 +75,10 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 # psth - dict of PSTHs (psth[region] = (time,units,conditions))
 # params - session-specific params used for analyses
     
-# to get registered coordinates, you have to do
-p = nwbfile.units[0]['electrodes'][0] # probe this unit was recorded on
-p = []
-for i in range(len(nwbfile.units)):
-    p.append(int(nwbfile.units[i]['electrodes']))
-<<<<<<< HEAD
-# np.sum(np.isin(np.unique(p),np.arange(0,len(nwbfile.electrodes))))
-=======
-
-
->>>>>>> 7d8046c9da50220ee0b1f3ba74a03fcbb8fbc349
-# %%
-x = []
-y = []
-z = []
-for i in range(len(p)):
-<<<<<<< HEAD
-    x.append(nwbfile.electrodes[p[i]].x.item())
-    y.append(nwbfile.electrodes[p[i]].y.item())
-    z.append(nwbfile.electrodes[p[i]].z.item())
+# %%    
+# save ccf coords of each unit/electrode to csv
+utils.saveElectrodeCCFCoords(nwbfile,dataDir,sub,date)
     
-coords = np.vstack((np.array(z),np.array(y),np.array(x))).T # (nUnits,3)
-
-# np.save('coords'+sub+'_'+date,coords)
-    
-# x = np.array(x)/1000
-# y = np.array(y)/1000
-# z = np.array(z)/1000
-# # %%
-# with plt.style.context('opinionated_rc'):
-#     fig = plt.figure(figsize=(4,3))
-#     ax = fig.add_subplot(projection='3d')
-#     ax.scatter(x, y, z, s=5)
-    
-#     ax.set_xlabel('AP')
-#     ax.set_ylabel('DV')
-#     ax.set_zlabel('ML')    
-#     ax.set_xlim((0,13)) # ap
-#     ax.set_ylim((0,8))  # dv
-#     ax.set_zlim((0,11.5)) # ml
-#     ax.view_init(elev=133, azim=90)
-=======
-    x.append( nwbfile.electrodes[p[i]].x.item() )
-    y.append( nwbfile.electrodes[p[i]].y.item() )
-    z.append( nwbfile.electrodes[p[i]].z.item() )
-
-coords = np.vstack((np.array(z),np.array(y),np.array(x))).T
-
-
-# np.save('coords'+sub+'_'+date, coords)
->>>>>>> 7d8046c9da50220ee0b1f3ba74a03fcbb8fbc349
-
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 # TODO: GET KINEMATICS
