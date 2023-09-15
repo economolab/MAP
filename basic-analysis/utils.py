@@ -194,6 +194,7 @@ def findNWB(dataDir,sub,date):
     
     sessionList = os.listdir(os.path.join(dataDir,"sub-"+sub))
     sessions = [s for s in sessionList if date in s]
+    sessions = [s for s in sessions if 'csv' not in s] # remove ccfcoords.csv from list
     return sessions
 
 # %%
@@ -263,6 +264,32 @@ def findTrialForEvent(ev, tstart, tend):
             trial[i] = t[0]
         
     return trial
+
+# %%
+def saveElectrodeCCFCoords(nwbfile,dataDir,sub,date):
+    # get x,y,z coords in Allen CCF space for each unit/electrode
+    posLabels = ['x','y','z']
+    nUnits = len(nwbfile.units)
+    coords = np.zeros((nUnits,3))
+    probe = []
+    probe_type = []
+    for iunit in range(nUnits):
+        for ilabel,label in enumerate(posLabels):
+            e = nwbfile.units[iunit]['electrodes'].item()
+            coords[iunit,ilabel] = nwbfile.electrodes[e][label].item()
+        egroup_desc = nwbfile.units[iunit]['electrode_group'].item().description
+        egroup_desc_dict = dict(eval(egroup_desc))
+        probe.append(egroup_desc_dict['probe'])
+        probe_type.append(egroup_desc_dict['probe_type'])
+        
+    
+    df = pd.DataFrame((coords),columns=posLabels)
+    df['probe'] = probe
+    df['probe_type'] = probe_type
+    
+    savedir = os.path.join(dataDir,'sub-'+sub)
+    df.to_csv(os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv'),index=False)
+    # coords = np.vstack((np.array(z),np.array(y),np.array(x))).T # (nUnits,3) # order to plot in brainrender
 
 # %%
 def taskPerformance(trials_df,trialid,cond2use, c, labels, plot=1):
