@@ -31,7 +31,8 @@ import pandas as pd
 
 from brainrender import Scene, Animation
 from vedo import embedWindow, Plotter, show  # <- this will be used to render an embedded scene 
-from brainrender.actors import Points, PointsDensity, Cylinder
+from brainrender import settings
+from brainrender.atlas_specific import GeneExpressionAPI
 
 from rich import print
 from myterial import orange
@@ -65,30 +66,27 @@ ew = 'k3d' # render in interactive plot in vscode
 # ew = None  # render in separate window outside of jupyer notebook
 embedWindow(ew)
 
-scene = Scene(title="Labelled cells",atlas_name="allen_mouse_100um", inset=False)
-if ew == 'k3d': 
-    scene.jupyter = True
+settings.SHOW_AXES = False
+scene = Scene(inset=False)
 
-mos = scene.add_brain_region("MOs",color='yellow', alpha=0.15)
-irn = scene.add_brain_region("IRN", alpha=0.15)
+gene = "Gpr161"
+geapi = GeneExpressionAPI()
 
-# scene.add_label(irn, "IRN") # only works with ew=None
-# scene.add_label(mos, "MOs")
+expids = geapi.get_gene_experiments(gene)
+data = geapi.get_gene_data(gene, expids[1])
 
-# Add to scene
-# plot electrodes of each probe separately (only way to color them separately)
-groups = df.groupby('probe')
-for p,group in groups:
-    coords = np.array(group.iloc[:,0:3])
-    coords2plot = coords.copy()
-    coords2plot[:, [2, 0]] = coords2plot[:, [0, 2]]
-    scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors="blackboard", radius=45))
-# scene.add(PointsDensity(coordinates))
+gene_actor = geapi.griddata_to_volume(data, min_quantile=99, cmap="coolwarm")
+act = scene.add(gene_actor)
 
-# scene.slice('sagittal')
+# ca1 = scene.add_brain_region("CA1", alpha=0.2, color="skyblue")
+# ca3 = scene.add_brain_region("CA3", alpha=0.5, color="salmon")
+ca3 = scene.add_brain_region("grey", alpha=0.5, color="salmon")
 
-# render
-scene.content
+
+scene.add_silhouette(act)
+
+scene.render(zoom=1.6)
+
 scene.render(zoom=1.25)
 
 # %%
