@@ -268,28 +268,40 @@ def findTrialForEvent(ev, tstart, tend):
 # %%
 def saveElectrodeCCFCoords(nwbfile,dataDir,sub,date):
     # get x,y,z coords in Allen CCF space for each unit/electrode
+    units = nwbfile.units
+    unit_electrodes = units.electrodes.data[:]
+
+
     posLabels = ['x','y','z']
     nUnits = len(nwbfile.units)
     coords = np.zeros((nUnits,3))
     probe = []
     probe_type = []
-    for iunit in range(nUnits):
+    electrode = []
+    region = []
+    for iunit in tqdm(range(nUnits)):
         for ilabel,label in enumerate(posLabels):
-            e = nwbfile.units[iunit]['electrodes'].item()
-            coords[iunit,ilabel] = nwbfile.electrodes[e][label].item()
-        egroup_desc = nwbfile.units[iunit]['electrode_group'].item().description
+            # e = nwbfile.units[iunit]['electrodes'].item()
+            coords[iunit,ilabel] = nwbfile.electrodes[unit_electrodes[iunit]][label].item()
+        egroup_desc = units[iunit]['electrode_group'].item().description
         egroup_desc_dict = dict(eval(egroup_desc))
         probe.append(egroup_desc_dict['probe'])
-        probe_type.append(egroup_desc_dict['probe_type'])
-        
+        probe_type.append(egroup_desc_dict['probe_type']) 
+        electrode.append(unit_electrodes[iunit])
+        region.append(dict(eval(units[iunit].electrode_group.item().location))['brain_regions'])
     
     df = pd.DataFrame((coords),columns=posLabels)
     df['probe'] = probe
     df['probe_type'] = probe_type
+    df['region'] = region
+    df['electrode'] = electrode
     
     savedir = os.path.join(dataDir,'sub-'+sub)
     df.to_csv(os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv'),index=False)
     # coords = np.vstack((np.array(z),np.array(y),np.array(x))).T # (nUnits,3) # order to plot in brainrender
+    # The common reference space is in PIR orientation where x axis = Anterior-to-Posterior, y axis = Superior-to-Inferior and z axis = Left-to-Right.
+    # http://help.brain-map.org/display/mouseconnectivity/API#API-DownloadAtlas3-DReferenceModels
+    return df
 
 # %%
 def taskPerformance(trials_df,trialid,cond2use, c, labels, plot=1):
