@@ -8,6 +8,7 @@ import importlib
 from tqdm import tqdm
 from scipy import stats
 import pandas as pd
+import nrrd
 
 from time import sleep
 import os
@@ -59,16 +60,15 @@ else:  # Macbook Pro M2
     # dataDir = '/Volumes/MUNIB_SSD/Economo-Lab/data/'
     dataDir = '/Users/munib/Economo-Lab/data'
 
-proj = "map-ephys" # subdirectory of dataDir
-dataDir = os.path.join(dataDir, proj)
+proj = "map" # subdirectory of dataDir
 
-sub = '484676' # subject/animal id
-date = '20210420' # session date
+sub = '479121' # subject/animal id
+date = '20200924' # session date
 
 behav_only = 1 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
 
 nwbfile, units_df, trials_df, trialdat, psth, params = \
-    utils.loadData(dataDir,sub,date,par,behav_only=behav_only)
+    utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=behav_only)
 # nwbfile - the raw data file in read only mode
 # units_df - dataframe containing info about neurons/units
 # trialdat - dict containing single trial firing rates (trialdat[region] = (time,trials,units))
@@ -77,8 +77,43 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
     
 # %%    
 # save ccf coords of each unit/electrode to csv
-utils.saveElectrodeCCFCoords(nwbfile,dataDir,sub,date)
+coords_df = utils.saveElectrodeCCFCoords(nwbfile,os.path.join(dataDir,proj),sub,date)
+# coords_df contains electrode information and each row corresponds to nwbfile.units
+
+# %%
+# for each electrode coordinate, determine region in allen ccf
+ccfDir = 'allenccf'
+
+ccffile = 'structure_centers.csv'
+ccf_df = pd.read_csv(os.path.join(dataDir, ccfDir, ccffile))   
+
+acrfile = 'structures.csv'
+acr_df = pd.read_csv(os.path.join(dataDir, ccfDir, acrfile))   
+
+# annofile = 'average_template_10.nrrd'
+# anno,header = nrrd.read(os.path.join(dataDir, ccfDir, annofile))   
     
+# %%
+
+from scipy.spatial import KDTree
+tree = KDTree(np.array(np.array(ccf_df.iloc[:,1:4])))
+structure_ids = []
+for i in range(len(coords_df)):
+    c = np.array(coords_df.iloc[i,0:3])[::-1]
+    ix = tree.query(c)[1]
+    if ix<1680:
+        structure_ids.append( ccf_df.iloc[ix,:].structure_id )
+
+ustruct = np.unique(structure_ids)
+acr = []
+name = []
+for i in range(len(ustruct)):
+    acr.append(acr_df.iloc[np.where(acr_df.id==ustruct[i])[0][0]].acronym)
+    name.append(acr_df.iloc[np.where(acr_df.id==ustruct[i])[0][0]]['name'])
+
+
+
+
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 # TODO: GET KINEMATICS
