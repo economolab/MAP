@@ -176,7 +176,7 @@ def loadData(dataDir,sub,date,par,behav_only=0):
         # params.cluid corresponds to units_df.iloc, not to units_df.unit
         # TODO - handle case where no cells found for a given region in par.regions
         units_df, params = findClusters(units_df, par, params)
-        trialdat, psth = getSeq(nwbfile, par, params, units_df)
+        trialdat, psth = getSeq(nwbfile, par, params, units_df,trials_df)
     else:
         units_df = np.nan
         trialdat = np.nan
@@ -255,16 +255,27 @@ def findTrialForEvent(ev, tstart, tend):
     # tstart = np.array(trials_df.start_time)
     # tend = np.array(trials_df.stop_time)
     
-    trial = np.zeros_like(ev)
-    for i in range(trial.shape[0]):
-        t = np.where(np.logical_and(ev[i]>=tstart, ev[i]<=tend))[0].tolist()
-        if len(t)==0:
-            trial[i] = np.nan # probably occurred in the ITI
-        else:
-            trial[i] = t[0]
-        
-    return trial
+    # trial = np.zeros_like(ev)
+    # for i in range(trial.shape[0]):
+    #     t = np.where(np.logical_and(ev[i]>=tstart, ev[i]<=tend))[0].tolist()
+    #     if len(t)==0:
+    #         trial[i] = np.nan # probably occurred in the ITI
+    #     else:
+    #         trial[i] = t[0]
 
+    # VECTORIZED VERSION - MUCH FASTER
+    # Create a 2D boolean mask where each row represents
+    # whether the corresponding event falls within a trial
+    mask = (ev[:, None] >= tstart) & (ev[:, None] <= tend) # (nEvents,nTrials)
+    
+    # Find the first occurrence of True in each row
+    first_occurrence = np.argmax(mask, axis=1)
+    
+    # Use this information to fill the 'trial' array
+    trial = np.where(np.any(mask, axis=1), first_occurrence, np.nan)
+    
+    return trial
+        
 # %%
 def saveElectrodeCCFCoords(nwbfile,dataDir,sub,date):
     # get x,y,z coords in Allen CCF space for each unit/electrode
@@ -422,8 +433,7 @@ def lickRaster(nwbfile, trials_df, par, params, cond2plot, cols, labels):
             # ax.scatter(tm[i],trial[i],color=c[i],s=s,label=labels[i])
             # ax.scatter(tm[i],trial[i],s=s,c=dir[i],cmap='seismic')
             ax.scatter(tm[i],trial[i],s=s,c=c[i],cmap='seismic')
-        for ev,evtm in params.ev.items(): # indicate epochs with vertical dashed lines
-            ax.axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)
+            plotEventTimes(ax,params.ev)
         ax.set_xlabel(f'Time from {par.alignEvent} (s)',fontsize=12)
         ax.set_ylabel(f'Trials',fontsize=12)
         ax.tick_params(axis='both', which='major', labelsize=12)
@@ -498,7 +508,7 @@ def findClusters(units_df,par,params):
     return units_df, params
 
 # %%
-def getSeq(nwbfile,par,params,units_df):
+def getSeq(nwbfile,par,params,units_df,trials_df):
 
     # TIME VECTOR
     edges = np.arange(par.tmin,par.tmax,par.dt)
@@ -510,6 +520,9 @@ def getSeq(nwbfile,par,params,units_df):
     smN = par.smooth[0]
     smSTD = par.smooth[1]
     smBoundary = par.smooth[2]
+
+    tstart = np.array(trials_df.start_time)
+    tend = np.array(trials_df.stop_time)
 
     trialdat = dict()
     psth = dict()
@@ -527,6 +540,11 @@ def getSeq(nwbfile,par,params,units_df):
             unit = params.cluid[region][iunit]
             for trix,time in enumerate(alignTimes): # loop over trials and alignment times
                 spktm = units_df.spike_times.iloc[unit]
+
+                spktrial = findTrialForEvent(spktm, tstart, tend)
+                # subset spktm to those that occur on current trial
+                # spktm = spktm[spktrial==trix]
+
                 spktm_aligned = spktm - time
                 # Keep only spike times in a given time window around the stimulus onset
                 trialtm = spktm_aligned[
@@ -580,8 +598,7 @@ def calcSelectivity(psth,cond2use,region,tedges,params,par,pref_=1,plot=1):
         plt.rcParams['font.size'] = 14
         ax.plot(par.time,mu,color=(0.66, 0.41, 0.96))
         ax.fill_between(par.time, (mu-ci), (mu+ci), color=(0.66, 0.41, 0.96), alpha=0.2,ec='none')
-        for ev,evtm in params.ev.items():
-            plt.axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)
+        plotEventTimes(ax,params.ev)
         alignEvent = par.alignEvent
         plt.xlabel(f'Time from {alignEvent} (s)')
         plt.ylabel('Selectivity (spks/s)')
@@ -727,8 +744,7 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
                 ax[iraster].get_xaxis().set_ticklabels([])
                 ax[iraster].set_xlim(par.tmin,par.tmax)
                 ax[iraster].set_ylabel('Trials',fontsize=12)
-                for ev,evtm in params.ev.items(): # indicate epochs with vertical dashed lines
-                    ax[iraster].axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)
+                plotEventTimes(ax,params.ev)
         
         # PLOT PSTH
         for i,cond in enumerate(cond2plot):
@@ -744,8 +760,7 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             ax[ipsth].plot(par.time,mu,color=cols[i],lw=lw[i], label=leg)
             ax[ipsth].fill_between(par.time, (mu-sem), (mu+sem), 
                             color=cols[i], alpha=0.2,ec='none', label='_nolegend_')
-            for ev,evtm in params.ev.items(): # indicate epochs with vertical dashed lines
-                ax[ipsth].axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)
+            plotEventTimes(ax,params.ev)
             ax[ipsth].set_xlabel(f'Time from {par.alignEvent} (s)',fontsize=12)
             ax[ipsth].set_ylabel('Firing rate (spks/s)',fontsize=12)
             ax[ipsth].set_xlim(par.tmin,par.tmax)
@@ -832,3 +847,9 @@ def selectivity_heatmap(dat,params,rows,cols,xlim,ylim,cmap='coolwarm',vline=1,h
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
     plt.show()
+
+# %%
+def plotEventTimes(ax,paramsev):
+    # paramsev == params.ev
+    for ev,evtm in paramsev.items(): # indicate epochs with vertical dashed lines
+            ax.axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)

@@ -65,7 +65,7 @@ proj = "map" # subdirectory of dataDir
 sub = '479121' # subject/animal id
 date = '20200924' # session date
 
-behav_only = 1 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
+behav_only = 0 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
 
 nwbfile, units_df, trials_df, trialdat, psth, params = \
     utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=behav_only)
@@ -74,7 +74,31 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 # trialdat - dict containing single trial firing rates (trialdat[region] = (time,trials,units))
 # psth - dict of PSTHs (psth[region] = (time,units,conditions))
 # params - session-specific params used for analyses
-    
+
+# %% GET TRIAL AND TRIALTM FOR EACH UNIT
+tstart = np.array(trials_df.start_time)
+tend = np.array(trials_df.stop_time)
+align = utils.getBehavEventTimestamps(nwbfile,par.alignEvent)
+
+with plt.style.context('opinionated_rc'):
+    for i in range(len(nwbfile.units)):
+
+        tm = nwbfile.units[i].spike_times.item()
+        trial = utils.findTrialForEvent(tm,tstart,tend).astype(int)
+
+        trialtm = tm - align[trial]
+
+        fig,ax = plt.subplots()
+        plt.scatter(trialtm,trial,s=1)
+        utils.plotEventTimes(ax,params.ev)
+        ax.set_xlim((-2.5,2.5))
+        if i == 10:
+            break
+
+# %%
+
+# %%    
+
 # %%    
 # save ccf coords of each unit/electrode to csv
 coords_df = utils.saveElectrodeCCFCoords(nwbfile,os.path.join(dataDir,proj),sub,date)
@@ -149,7 +173,7 @@ utils.lickRaster(nwbfile, trials_df, par, params, cond2plot, c, labels)
 
 # fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
 # fname = 'lickRaster_hit_inactivation'
-# utils.mysavefig(fpth,fname)
+utils.mysavefig(fpth,fname)
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
