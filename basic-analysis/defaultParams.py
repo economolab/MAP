@@ -91,6 +91,10 @@ def getDefaultParams():
     defparams.condition.append(
         L + '&' + no_autowater + '&' + no_freewater + '&' + no_stim)
     
+
+    defparams.behav_only = 0 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
+
+    
     return defparams
 
 

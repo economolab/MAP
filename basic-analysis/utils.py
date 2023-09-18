@@ -188,7 +188,9 @@ def loadData(dataDir,sub,date,par,behav_only=0):
         # FIND CLUSTERS - subset units based on lowFR, quality, and region
         # params.cluid corresponds to units_df.iloc, not to units_df.unit
         # TODO - handle case where no cells found for a given region in par.regions
+        # TODO - should be based on allen ccf regions
         units_df, params = findClusters(units_df, par, params)
+        units_df = alignSpikeTimes(nwbfile,units_df,trials_df,params,par)
         trialdat, psth = getSeq(nwbfile, par, params, units_df,trials_df)
     else:
         units_df = np.nan
@@ -253,7 +255,8 @@ def getEventTimes(nwbfile, trials_df, params, alignEvent, events):
         
         align = alignTimes[trix]
         evtm_aligned = evtm - align
-        evdict[ev] = np.round(stats.mode(evtm_aligned)[0][0],2)
+        evdict[ev] = np.round(stats.mode(evtm_aligned)[0],2)
+    
         
     return evdict
 
@@ -350,10 +353,6 @@ def saveCCFCoordsAndRegion(nwbfile,saveDir,ccfDir,sub,date):
     df['region'] = region
     df['acronym'] = acronym
     
-    tree.get_structures_by_name(['Dorsal auditory area'])
-    
-    tree.get_structures_by_name(['Dorsal auditory area'])[0]['acronym']
-    
     # add probe and probe_type
     nUnits = len(units)
     probe = []
@@ -367,6 +366,7 @@ def saveCCFCoordsAndRegion(nwbfile,saveDir,ccfDir,sub,date):
     df['probe'] = probe
     df['probe_type'] = probe_type
     
+    # save
     savedir = os.path.join(saveDir,'sub-'+sub)
     savefn = os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv')
     df.to_csv(savefn,index=False)
@@ -607,6 +607,37 @@ def findClusters(units_df,par,params):
     
     return units_df, params
 
+# %% 
+def alignSpikeTimes(nwbfile,units_df,trials_df,params,par):
+    # gets spike times within trial and then aligns to align event
+    
+    tstart = np.array(trials_df.start_time)
+    tend = np.array(trials_df.stop_time)
+    align = getBehavEventTimestamps(nwbfile,par.alignEvent)
+    
+    units_df['trial'] = np.nan
+    units_df['trial'] = units_df['trial'].apply(lambda x: [x])
+    units_df['trialtm'] = np.nan
+    units_df['trialtm'] = units_df['trialtm'].apply(lambda x: [x])
+
+    trial = []
+    trialtm = []
+    for i in range(2): #range(len(nwbfile.units)):
+        tm = nwbfile.units[i].spike_times.item()
+        trial = findTrialForEvent(tm,tstart,tend).astype(int)
+        trialtm = tm - align[trial]
+        units_df['trial'][i] = trial
+        units_df['trialtm'][i] = trialtm
+
+    return units_df
+
+    # udf = utils.alignSpikeTimes(nwbfile,units_df,trials_df,params,par)
+    # print(udf.iloc[0].trialtm.shape)
+    # print(udf.iloc[0].trial.shape)
+    # print(udf.iloc[0].spike_times.shape)    
+    
+    
+
 # %%
 def getSeq(nwbfile,par,params,units_df,trials_df):
 
@@ -641,7 +672,7 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
             for trix,time in enumerate(alignTimes): # loop over trials and alignment times
                 spktm = units_df.spike_times.iloc[unit]
 
-                spktrial = findTrialForEvent(spktm, tstart, tend)
+                # spktrial = findTrialForEvent(spktm, tstart, tend)
                 # subset spktm to those that occur on current trial
                 # spktm = spktm[spktrial==trix]
 

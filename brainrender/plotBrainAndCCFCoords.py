@@ -21,8 +21,7 @@ from pathlib import Path
 
 import utils
 
-# %%
-_ = importlib.reload(sys.modules['utils'])
+# _ = importlib.reload(sys.modules['utils'])
 
 # %%
 
@@ -38,34 +37,33 @@ dataDir = os.path.join(dataDir, proj)
 
 # sub = '484676' # subject/animal id
 # date = '20210420' # session date
-sub = '479121' # subject/animal id
-date = '20200924' # session date
+sub = '484677' # subject/animal id
+date = '20210418' # session date
 
 df = utils.loadCoordinates(dataDir,sub,date)
 
-# %%
 
-ew = 'k3d' # render in interactive plot in vscode
-# ew = None  # render in separate window outside of jupyer notebook
+
+# ew = 'k3d' # render in interactive plot in vscode
+ew = None  # render in separate window outside of jupyer notebook
 embedWindow(ew)
 
 title = 'sub-'+sub+'_ses-'+date
-scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.05)
+scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.1)
 if ew == 'k3d': 
     scene.jupyter = True
 
 reg2plot = np.unique(df.acronym)
 reg2plot = reg2plot[reg2plot!='0'] # remove 'outside brain'
-reg = []
+reg2plot = ['MOs','IRN','SCm','STR']
+cols = ['#33A1FD','#9448BC','#FF495C','#568259']
 for i in range(len(reg2plot)):
-    a = scene.add_brain_region(reg2plot[i], alpha=0.15, color='blackboard')
+    a = scene.add_brain_region(reg2plot[i], alpha=0.2, color=cols[i])
     # # can speicfy color using hex (or a string)
     # a = scene.add_brain_region(reg2plot[i],color='#ff5733', alpha=0.15)
     # scene.add_label(a, reg2plot[i]) # only works with ew=None
-# scene.add_brain_region('IRN',color='yellow', alpha=0.15)
-# # mos = scene.add_brain_region("MOs",color='yellow', alpha=0.15)
 
-# %%
+
 # scene.add_label(irn, "IRN") # only works with ew=None
 # scene.add_label(mos, "MOs")
 
@@ -74,18 +72,19 @@ for i in range(len(reg2plot)):
 groups = df.groupby('probe')
 for p,group in groups:
     coords = np.array(group.iloc[:,1:4])
+    coords = coords[~np.all(coords == 0, axis=1)]
     coords2plot = utils.permute(coords,[2, 1, 0])
-    scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors="blackboard", radius=45))
+    scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors="#FDCA40", radius=75))
 
 # scene.add(PointsDensity(coordinates))
 
 # scene.slice('sagittal')
-# %%
+
 # render
 scene.content
 scene.render(zoom=1.25)
 
-# %%
+
 # if ew=='k3d' - run these last two lines of code again and it'll render
 if ew=='k3d':
     # plt = Plotter()
