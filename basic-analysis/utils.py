@@ -344,11 +344,15 @@ def saveCCFCoordsAndRegion(nwbfile,saveDir,ccfDir,sub,date):
         struct_id[i] = anno[pos[0],pos[1],pos[2]]
 
     region = [name_map[sid] if sid!=0 else '0' for sid in struct_id]
+    acronym = [tree.get_structures_by_name([r])[0]['acronym'] if r!='0' else '0' for r in region]
     
     df['id'] = struct_id
     df['region'] = region
+    df['acronym'] = acronym
     
-    # TODO get acronym
+    tree.get_structures_by_name(['Dorsal auditory area'])
+    
+    tree.get_structures_by_name(['Dorsal auditory area'])[0]['acronym']
     
     # add probe and probe_type
     nUnits = len(units)

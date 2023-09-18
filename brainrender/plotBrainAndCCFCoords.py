@@ -45,8 +45,8 @@ df = utils.loadCoordinates(dataDir,sub,date)
 
 # %%
 
-# ew = 'k3d' # render in interactive plot in vscode
-ew = None  # render in separate window outside of jupyer notebook
+ew = 'k3d' # render in interactive plot in vscode
+# ew = None  # render in separate window outside of jupyer notebook
 embedWindow(ew)
 
 title = 'sub-'+sub+'_ses-'+date
@@ -54,13 +54,12 @@ scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.05
 if ew == 'k3d': 
     scene.jupyter = True
 
-reg2plot = np.unique(df.region)
+reg2plot = np.unique(df.acronym)
 reg2plot = reg2plot[reg2plot!='0'] # remove 'outside brain'
 reg = []
 for i in range(len(reg2plot)):
-    pass
-    # a = scene.add_brain_region(reg2plot[i], alpha=0.15)
-    # can speicfy color using hex (or a string)
+    a = scene.add_brain_region(reg2plot[i], alpha=0.15, color='blackboard')
+    # # can speicfy color using hex (or a string)
     # a = scene.add_brain_region(reg2plot[i],color='#ff5733', alpha=0.15)
     # scene.add_label(a, reg2plot[i]) # only works with ew=None
 # scene.add_brain_region('IRN',color='yellow', alpha=0.15)
@@ -89,8 +88,9 @@ scene.render(zoom=1.25)
 # %%
 # if ew=='k3d' - run these last two lines of code again and it'll render
 if ew=='k3d':
-    plt = Plotter()
-    plt.show(*scene.renderables)
+    # plt = Plotter()
+    # plt.show(*scene.renderables)
+    show(*scene.renderables) 
 
 # %%
 
