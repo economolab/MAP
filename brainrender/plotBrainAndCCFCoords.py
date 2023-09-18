@@ -54,46 +54,19 @@ scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.05
 if ew == 'k3d': 
     scene.jupyter = True
 
-# reg2plot = ['AIp6a', 'B', 'CENT', 'CENT2', 'CENT3',  'CP',
-#         'DT', 'FRP6a', 'FRP6b', 'I5', 'IC', 'ICc', 'ISN',
-#         'LAV', 'LC', 'MEV', 'MOs1', 'MOs2/3', 'MOs5',
-#        'ORBm6b', 'ORBvl6b', 'PIL', 'PL6a', 'POL', 'SGN', 'SIM', 'SLC',
-#        'SLD', 'SNr', 'SPVO', 'SSp-ul6a', 'VIIn', 'bsc', 'cbf', 'dhc',
-#         'gVIIn', 'scp']
-
-reg2plot = ['AMBv',
- 'V4',
- 'LIN',
- 'SPIV',
- 'MY-sen',
- 'MDRN',
- 'SPVC',
- 'ORBl6a',
- 'ORBl6b',
- 'CBX',
- 'ORBvl6a',
- 'ORBl5',
- 'MOs1',
- 'arb',
- 'x',
- 'aco',
- 'ECU',
- 'LRNm',
- 'MOs2/3',
- 'COPY',
- 'MDRNd',
- 'FRP6a',
- 'FRP6b']
+reg2plot = np.unique(df.region)
+reg2plot = reg2plot[reg2plot!='0'] # remove 'outside brain'
 reg = []
 for i in range(len(reg2plot)):
-    a = scene.add_brain_region(reg2plot[i], alpha=0.15)
+    pass
+    # a = scene.add_brain_region(reg2plot[i], alpha=0.15)
     # can speicfy color using hex (or a string)
     # a = scene.add_brain_region(reg2plot[i],color='#ff5733', alpha=0.15)
     # scene.add_label(a, reg2plot[i]) # only works with ew=None
 # scene.add_brain_region('IRN',color='yellow', alpha=0.15)
 # # mos = scene.add_brain_region("MOs",color='yellow', alpha=0.15)
 
-
+# %%
 # scene.add_label(irn, "IRN") # only works with ew=None
 # scene.add_label(mos, "MOs")
 
@@ -101,9 +74,8 @@ for i in range(len(reg2plot)):
 # plot electrodes of each probe separately (only way to color them separately)
 groups = df.groupby('probe')
 for p,group in groups:
-    coords = np.array(group.iloc[:,0:3])
-    coords2plot = coords.copy()
-    coords2plot[:, [2, 0]] = coords2plot[:, [0, 2]]
+    coords = np.array(group.iloc[:,1:4])
+    coords2plot = utils.permute(coords,[2, 1, 0])
     scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors="blackboard", radius=45))
 
 # scene.add(PointsDensity(coordinates))

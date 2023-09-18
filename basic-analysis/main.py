@@ -65,7 +65,7 @@ proj = "map" # subdirectory of dataDir
 sub = '479121' # subject/animal id
 date = '20200924' # session date
 
-behav_only = 0 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
+behav_only = 1 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
 
 nwbfile, units_df, trials_df, trialdat, psth, params = \
     utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=behav_only)
@@ -100,43 +100,15 @@ with plt.style.context('opinionated_rc'):
 # %%    
 
 # %%    
+_ = importlib.reload(sys.modules['utils'])
+
 # save ccf coords of each unit/electrode to csv
-coords_df = utils.saveElectrodeCCFCoords(nwbfile,os.path.join(dataDir,proj),sub,date)
-# coords_df contains electrode information and each row corresponds to nwbfile.units
-
-# %%
-# for each electrode coordinate, determine region in allen ccf
-ccfDir = 'allenccf'
-
-ccffile = 'structure_centers.csv'
-ccf_df = pd.read_csv(os.path.join(dataDir, ccfDir, ccffile))   
-
-acrfile = 'structures.csv'
-acr_df = pd.read_csv(os.path.join(dataDir, ccfDir, acrfile))   
-
-# annofile = 'average_template_10.nrrd'
-# anno,header = nrrd.read(os.path.join(dataDir, ccfDir, annofile))   
-    
-# %%
-
-from scipy.spatial import KDTree
-tree = KDTree(np.array(np.array(ccf_df.iloc[:,1:4])))
-structure_ids = []
-for i in range(len(coords_df)):
-    c = np.array(coords_df.iloc[i,0:3])[::-1]
-    ix = tree.query(c)[1]
-    if ix<1680:
-        structure_ids.append( ccf_df.iloc[ix,:].structure_id )
-
-ustruct = np.unique(structure_ids)
-acr = []
-name = []
-for i in range(len(ustruct)):
-    acr.append(acr_df.iloc[np.where(acr_df.id==ustruct[i])[0][0]].acronym)
-    name.append(acr_df.iloc[np.where(acr_df.id==ustruct[i])[0][0]]['name'])
-
-
-
+csvdir = os.path.join(dataDir,proj) # where to save results
+if os.name == 'nt':  # Windows PC (office)
+    ccfdir = r'C:\Users\munib\Documents\Economo-Lab\code\map\allenccf'
+else:
+    ccfdir = '/Users/munib/Economo-Lab/code/map/allenccf'
+coords_df = utils.saveCCFCoordsAndRegion(nwbfile,csvdir,ccfdir,sub,date)
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 

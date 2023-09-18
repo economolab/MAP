@@ -5,6 +5,7 @@ from pynwb import NWBHDF5IO
 import numpy as np
 import pandas as pd
 
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 # plt.style.use('dark_background')
@@ -16,6 +17,10 @@ import matplotlib as mpl
 mpl.rcParams['font.size'] = 12
 
 from tqdm import tqdm
+
+from allensdk.core.reference_space_cache import ReferenceSpaceCache
+from pathlib import Path
+import nrrd
 
 
 # %% CLASSES
@@ -105,6 +110,14 @@ def smooth(x, N, std, boundary=None):
     out = out[trim:,:]
     
     return out
+
+# %%
+def permute(a,permute_idx):
+    # a is a 2d numpy array, whose columns you want to permute
+    # permute_idx is a list of the permutation you want
+    idx = np.empty_like(permute_idx)
+    idx[permute_idx] = np.arange(len(permute_idx))
+    return a[:, idx]  # return a rearranged copy
 
 # %%
 def findTimeIX(tedges,time):
@@ -277,41 +290,124 @@ def findTrialForEvent(ev, tstart, tend):
     return trial
         
 # %%
-def saveElectrodeCCFCoords(nwbfile,dataDir,sub,date):
+def saveCCFCoordsAndRegion(nwbfile,saveDir,ccfDir,sub,date):
+    
     # get x,y,z coords in Allen CCF space for each unit/electrode
     units = nwbfile.units
+    unit_id = units.unit.data[:]
     unit_electrodes = units.electrodes.data[:]
+    
+    # get allen ccf registered electrode coords
+    electrodes = nwbfile.electrodes
+    x = electrodes.x.data[:].astype(int) # ML in Allen CCF
+    y = electrodes.y.data[:].astype(int) # DV in Allen CCF
+    z = electrodes.z.data[:].astype(int) # AP in Allen CCF
+    
+    # get those coordinates for each unit
+    x = x[unit_electrodes]
+    y = y[unit_electrodes]
+    z = z[unit_electrodes]
+    
+    # positions for electrodes outside brain are encoded as a very negative number. set these to 0
+    x[x<0] = 0
+    y[y<0] = 0
+    z[z<0] = 0
+    
+    # save to dataframe
+    df = pd.DataFrame()
+    df['unit'] = unit_id
+    df['x'] = x
+    df['y'] = y 
+    df['z'] = z 
+    df['electrodes'] = unit_electrodes
+    
+    # get annotations
+    annofile = 'annotation_10.nrrd' # 2017 - can download this using ReferenceSpaceCache.get_annotation_volume() or straight from server
+    # http://download.alleninstitute.org/informatics-archive/current-release/mouse_ccf/annotation/ccf_2017/
+    anno,header = nrrd.read(os.path.join(ccfDir, annofile))   
+    # anno[0,:,:] coronal section
+    # anno[:,0,:] dv section
+    # anno[:,:,0] sagittal section
+    
+    # get reference space and name map (dictionary from structure id in annotations to name of structure)
+    reference_space_key = os.path.join('annotation', 'ccf_2017')
+    resolution = 10
+    rspc = ReferenceSpaceCache(resolution, reference_space_key, manifest=Path(ccfDir) / 'manifest.json')
+    # ID 1 is the adult mouse structure graph
+    tree = rspc.get_structure_tree(structure_graph_id=1) 
+    name_map = tree.get_name_map()
+    
+    # get structure ids for each unit/electrode
+    struct_id = np.zeros_like(x)
+    for i in range(len(struct_id)):
+        pos = (np.array(df.iloc[i,1:4])[::-1] / resolution).astype(int) # get positions, divide by resolution, reverse to put in ccf coords            
+        struct_id[i] = anno[pos[0],pos[1],pos[2]]
 
-
-    posLabels = ['x','y','z']
-    nUnits = len(nwbfile.units)
-    coords = np.zeros((nUnits,3))
+    region = [name_map[sid] if sid!=0 else '0' for sid in struct_id]
+    
+    df['id'] = struct_id
+    df['region'] = region
+    
+    # TODO get acronym
+    
+    # add probe and probe_type
+    nUnits = len(units)
     probe = []
     probe_type = []
-    electrode = []
-    region = []
-    for iunit in tqdm(range(nUnits)):
-        for ilabel,label in enumerate(posLabels):
-            # e = nwbfile.units[iunit]['electrodes'].item()
-            coords[iunit,ilabel] = nwbfile.electrodes[unit_electrodes[iunit]][label].item()
+    for iunit in range(nUnits):
         egroup_desc = units[iunit]['electrode_group'].item().description
         egroup_desc_dict = dict(eval(egroup_desc))
         probe.append(egroup_desc_dict['probe'])
         probe_type.append(egroup_desc_dict['probe_type']) 
-        electrode.append(unit_electrodes[iunit])
-        region.append(dict(eval(units[iunit].electrode_group.item().location))['brain_regions'])
-    
-    df = pd.DataFrame((coords),columns=posLabels)
+        
     df['probe'] = probe
     df['probe_type'] = probe_type
-    df['region'] = region
-    df['electrode'] = electrode
     
-    savedir = os.path.join(dataDir,'sub-'+sub)
-    df.to_csv(os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv'),index=False)
-    # coords = np.vstack((np.array(z),np.array(y),np.array(x))).T # (nUnits,3) # order to plot in brainrender
-    # The common reference space is in PIR orientation where x axis = Anterior-to-Posterior, y axis = Superior-to-Inferior and z axis = Left-to-Right.
-    # http://help.brain-map.org/display/mouseconnectivity/API#API-DownloadAtlas3-DReferenceModels
+    savedir = os.path.join(saveDir,'sub-'+sub)
+    savefn = os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv')
+    df.to_csv(savefn,index=False)
+    print('Saved ' + savefn + ' !!!')
+    
+    # i = 0 
+    # ix = (np.array(df.iloc[i,1:4])[::-1] / resolution).astype(int)
+    # fig,ax = plt.subplots()
+    # plt.imshow(anno[ix[0],:,:]) # plot coronal section
+    # plt.clim(0,1500)
+    # plt.set_cmap('gray')
+    
+    # ############### OLD 
+
+    # posLabels = ['x','y','z']
+    # nUnits = len(nwbfile.units)
+    # coords = np.zeros((nUnits,3))
+    # probe = []
+    # probe_type = []
+    # electrode = []
+    # # region = []
+    # for iunit in tqdm(range(nUnits)):
+    #     for ilabel,label in enumerate(posLabels):
+    #         # e = nwbfile.units[iunit]['electrodes'].item()
+    #         coords[iunit,ilabel] = nwbfile.electrodes[unit_electrodes[iunit]][label].item()
+    #     egroup_desc = units[iunit]['electrode_group'].item().description
+    #     egroup_desc_dict = dict(eval(egroup_desc))
+    #     probe.append(egroup_desc_dict['probe'])
+    #     probe_type.append(egroup_desc_dict['probe_type']) 
+    #     electrode.append(unit_electrodes[iunit])
+    # #     region.append(dict(eval(units[iunit].electrode_group.item().location))['brain_regions'])
+    
+    # df = pd.DataFrame((coords),columns=posLabels)
+    # df['unit'] = 
+    # df['probe'] = probe
+    # df['probe_type'] = probe_type
+    # df['region'] = region
+    # df['electrode'] = electrode
+    
+    # savedir = os.path.join(dataDir,'sub-'+sub)
+    # df.to_csv(os.path.join(savedir,'sub-' + sub + '_ses-' + date + '_ccfcoords.csv'),index=False)
+    
+    # # The common reference space is in PIR orientation where x axis = Anterior-to-Posterior, y axis = Superior-to-Inferior and z axis = Left-to-Right.
+    # # http://help.brain-map.org/display/mouseconnectivity/API#API-DownloadAtlas3-DReferenceModels
+    
     return df
 
 # %%
