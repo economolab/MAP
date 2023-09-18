@@ -48,7 +48,7 @@ par = defaultParams.getDefaultParams()
 
 # change any default params below
 # par.regions = ['left ALM',  'left Striatum', 'right Medulla','left Midbrain']
-par.regions = ['left ALM']
+par.regions = ['right ALM']
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -62,13 +62,11 @@ else:  # Macbook Pro M2
 
 proj = "map" # subdirectory of dataDir
 
-sub = '479121' # subject/animal id
-date = '20200924' # session date
-
-behav_only = 1 # 1-trialdat,psth,units_df=NaN, 0-preprocess neural data
+sub = '484677' # subject/animal id
+date = '20210418' # session date
 
 nwbfile, units_df, trials_df, trialdat, psth, params = \
-    utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=behav_only)
+    utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=par.behav_only)
 # nwbfile - the raw data file in read only mode
 # units_df - dataframe containing info about neurons/units
 # trialdat - dict containing single trial firing rates (trialdat[region] = (time,trials,units))
