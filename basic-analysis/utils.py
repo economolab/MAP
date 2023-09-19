@@ -255,6 +255,7 @@ def getBehavEventTimestamps(nwbfile, ev):
 # %%
 def getEventTimes(nwbfile, trials_df, params, alignEvent, events):
     # returns params.ev = mode(behavioralEvent.timestamp) for 'events'
+    # i just use the output of this to plot event markers, not much else
     tstart = np.array(trials_df.start_time)
     tstop = np.array(trials_df.stop_time)
     early = np.where(np.array(trials_df.early_lick == 'early'))

@@ -1,4 +1,7 @@
-
+# made changes to settings.py to turn off axes
+# - /Users/munib/anaconda3/envs/brainrender/lib/python3.6/site-packages/brainrender/settings.py
+# made changes to scene.py to allow for setting the 'root' alpha
+# - /Users/munib/anaconda3/envs/brainrender/lib/python3.6/site-packages/brainrender/scene.py
 
 # %%
 # https://github.com/brainglobe/brainrender/blob/master/examples/notebook_workflow.ipynb
@@ -37,11 +40,14 @@ dataDir = os.path.join(dataDir, proj)
 
 # sub = '484676' # subject/animal id
 # date = '20210420' # session date
-sub = '484677' # subject/animal id
-date = '20210418' # session date
+sub = '480133' # subject/animal id
+date = '20210104' # session date
+
+screenshots_folder = os.path.join('figs',sub,date)
+if not os.path.isdir(screenshots_folder):
+    os.makedirs(screenshots_folder, exist_ok=True)
 
 df = utils.loadCoordinates(dataDir,sub,date)
-
 
 
 # ew = 'k3d' # render in interactive plot in vscode
@@ -49,16 +55,19 @@ ew = None  # render in separate window outside of jupyer notebook
 embedWindow(ew)
 
 title = 'sub-'+sub+'_ses-'+date
-scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.1)
+scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.1,
+              screenshots_folder=screenshots_folder)
 if ew == 'k3d': 
     scene.jupyter = True
 
 reg2plot = np.unique(df.acronym)
 reg2plot = reg2plot[reg2plot!='0'] # remove 'outside brain'
-reg2plot = ['MOs','IRN','SCm','STR']
+# reg2plot = ['MOs','IRN','SCm','STR']
+reg2plot = ['BLAa','CA3','SNr']
 cols = ['#33A1FD','#9448BC','#FF495C','#568259']
 for i in range(len(reg2plot)):
     a = scene.add_brain_region(reg2plot[i], alpha=0.2, color=cols[i])
+    # a = scene.add_brain_region(reg2plot[i], alpha=0.1, color='salmon')
     # # can speicfy color using hex (or a string)
     # a = scene.add_brain_region(reg2plot[i],color='#ff5733', alpha=0.15)
     # scene.add_label(a, reg2plot[i]) # only works with ew=None
