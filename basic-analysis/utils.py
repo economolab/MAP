@@ -4,6 +4,7 @@ import os
 from pynwb import NWBHDF5IO
 import numpy as np
 import pandas as pd
+import re
 
 
 import matplotlib.pyplot as plt
@@ -225,6 +226,26 @@ def findTrials(nwbfile,trials_df,conditions):
         trials.append(trials_df.query(cond).trial_uid.to_numpy() - 1) # trial_uid is 1-indexed, so subtracting 1
     
     return trials
+
+# %%
+def getAllRegions(sub,date):
+    if os.name == 'nt':  # Windows PC (office)
+        dataDir = r'C:\Users\munib\Documents\Economo-Lab\code\map\meta'
+    else:  # Macbook Pro M2
+        # dataDir = '/Volumes/MUNIB_SSD/Economo-Lab/data/'
+        dataDir = '/Users/munib/Economo-Lab/code/map/meta'
+        
+    df = pd.read_csv(os.path.join(dataDir,'allSessionsMetaData.csv'))
+    
+    regionstring = df[(df['sub'] == int(sub)) & (df['date'] == int(date))].regions
+    
+    samp= re.compile('[a-zA-z]+')
+    word = samp.findall(regionstring.item())
+    regions = []
+    for i in range(1,len(word)-1,2):
+        regions.append(word[i] + ' ' + word[i+1])
+    
+    return regions
 
 # %%
 def getBehavEventTimestamps(nwbfile, ev):
@@ -622,20 +643,22 @@ def alignSpikeTimes(nwbfile,units_df,trials_df,params,par):
 
     trial = []
     trialtm = []
-    for i in range(2): #range(len(nwbfile.units)):
-        tm = nwbfile.units[i].spike_times.item()
+    print('Getting trialtm_aligned and trial')
+    for i in tqdm(range(units_df.shape[0])): #range(len(nwbfile.units)):
+        tm = units_df['spike_times'][i]
         trial = findTrialForEvent(tm,tstart,tend).astype(int)
         trialtm = tm - align[trial]
         units_df['trial'][i] = trial
         units_df['trialtm'][i] = trialtm
-
+        
+    # print(units_df.iloc[0].trialtm.shape)
+    # print(units_df.iloc[0].trial.shape)
+    # print(units_df.iloc[0].spike_times.shape)    
+    
     return units_df
 
-    # udf = utils.alignSpikeTimes(nwbfile,units_df,trials_df,params,par)
-    # print(udf.iloc[0].trialtm.shape)
-    # print(udf.iloc[0].trial.shape)
-    # print(udf.iloc[0].spike_times.shape)    
     
+
     
 
 # %%
@@ -646,14 +669,14 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
     par.time = edges + par.dt / 2
     par.time = par.time[:-1]
 
-    alignTimes = getBehavEventTimestamps(nwbfile,par.alignEvent)
+    # alignTimes = getBehavEventTimestamps(nwbfile,par.alignEvent)
     
     smN = par.smooth[0]
     smSTD = par.smooth[1]
     smBoundary = par.smooth[2]
 
     tstart = np.array(trials_df.start_time)
-    tend = np.array(trials_df.stop_time)
+    # tend = np.array(trials_df.stop_time)
 
     trialdat = dict()
     psth = dict()
@@ -668,20 +691,22 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
 
         
         for iunit in tqdm(range(nUnits)): # loop over units
-            unit = params.cluid[region][iunit]
-            for trix,time in enumerate(alignTimes): # loop over trials and alignment times
-                spktm = units_df.spike_times.iloc[unit]
+            unit = params.cluid[region][iunit] # this is just the index of units_df (could just use iunit)
+            for trix in range(params.nTrials): # loop over trials and alignment times
+                # get spikes in current trial
+                trialtm = units_df.trialtm.iloc[unit] # already aligned
+                trial = units_df.trial.iloc[unit]
+                spkmask = np.isin(trial,trix)
+                # if no spikes found for current set of trials (trix), move on to
+                # next set
+                if np.all(~spkmask):
+                    continue
 
-                # spktrial = findTrialForEvent(spktm, tstart, tend)
-                # subset spktm to those that occur on current trial
-                # spktm = spktm[spktrial==trix]
-
-                spktm_aligned = spktm - time
-                # Keep only spike times in a given time window around the stimulus onset
-                trialtm = spktm_aligned[
-                    (par.tmin < spktm_aligned) & (spktm_aligned < par.tmax)
-                ]    
-                N = np.histogram(trialtm, edges)
+                # # Keep only spike times in a given time window around the stimulus onset
+                # trialtm = spktm_aligned[
+                #     (par.tmin < spktm_aligned) & (spktm_aligned < par.tmax)
+                # ]    
+                N = np.histogram(trialtm[spkmask], edges)
                 trialdat[region][:,trix,iunit] = smooth(N[0] / par.dt,smN,smSTD,smBoundary).reshape(-1)
                 
             # trial-average to get psth for each condition
@@ -689,6 +714,7 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
                 trix = params.trialid[icond]
                 temp = trialdat[region][:,trix,iunit]
                 psth[region][:,iunit,icond] = np.mean(temp,1) # mean across trials
+                
     return trialdat,psth
 
 # %% SELECTIVITY AND CODING DIRECTIONS
@@ -875,7 +901,7 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
                 ax[iraster].get_xaxis().set_ticklabels([])
                 ax[iraster].set_xlim(par.tmin,par.tmax)
                 ax[iraster].set_ylabel('Trials',fontsize=12)
-                plotEventTimes(ax,params.ev)
+                plotEventTimes(ax[iraster],params.ev)
         
         # PLOT PSTH
         for i,cond in enumerate(cond2plot):
@@ -891,7 +917,7 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             ax[ipsth].plot(par.time,mu,color=cols[i],lw=lw[i], label=leg)
             ax[ipsth].fill_between(par.time, (mu-sem), (mu+sem), 
                             color=cols[i], alpha=0.2,ec='none', label='_nolegend_')
-            plotEventTimes(ax,params.ev)
+            plotEventTimes(ax[ipsth],params.ev)
             ax[ipsth].set_xlabel(f'Time from {par.alignEvent} (s)',fontsize=12)
             ax[ipsth].set_ylabel('Firing rate (spks/s)',fontsize=12)
             ax[ipsth].set_xlim(par.tmin,par.tmax)
