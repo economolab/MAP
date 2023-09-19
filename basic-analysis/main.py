@@ -52,8 +52,8 @@ else:  # Macbook Pro M2
 
 proj = "map" # subdirectory of dataDir
 
-sub = '484677' # subject/animal id
-date = '20210418' # session date
+sub = '480133' # subject/animal id
+date = '20210104' # session date
 
 par = defaultParams.getDefaultParams() 
 
@@ -62,8 +62,7 @@ par = defaultParams.getDefaultParams()
 par.regions = ['right ALM']
 par.regions = utils.getAllRegions(sub,date)
 
-
-# par.behav_only = 1
+par.behav_only = 1
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # LOAD DATA
@@ -78,7 +77,6 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 
 
 # %%   CCF COORDINATES
-_ = importlib.reload(sys.modules['utils'])
 
 # save ccf coords of each unit/electrode to csv
 csvdir = os.path.join(dataDir,proj) # where to save results
@@ -86,6 +84,7 @@ if os.name == 'nt':  # Windows PC (office)
     ccfdir = r'C:\Users\munib\Documents\Economo-Lab\code\map\allenccf'
 else:
     ccfdir = '/Users/munib/Economo-Lab/code/map/allenccf'
+    
 coords_df = utils.saveCCFCoordsAndRegion(nwbfile,csvdir,ccfdir,sub,date)
 
 
@@ -321,6 +320,7 @@ plt.show()
 
 # %% DLC DATA
 
+
 acq = nwbfile.acquisition
 
 feats = ['Camera0_side_TongueTracking',
@@ -332,32 +332,49 @@ viddt = stats.mode(np.diff(vidtm), keepdims=True)[0][0]
 nFrames = len(vidtm)
 thresh = 0.95
 
-traj = np.zeros((nFrames, 2, len(feats)))
+traj = np.zeros((nFrames, 2, len(feats))) # (time,coord,feats)
 for i, feat in enumerate(feats):
     temp = acq['BehavioralTimeSeries'][feat].data[:][:, 0:2]
     proba = acq['BehavioralTimeSeries'][feat].data[:][:, 2]
     temp[proba < thresh, :] = np.nan
     traj[:, :, i] = temp
 
+tstart = np.array(trials_df.start_time)
+tend = np.array(trials_df.stop_time)
+align = utils.getBehavEventTimestamps(nwbfile,par.alignEvent)
+
+vidtrial = utils.findTrialForEvent(vidtm,tstart,tend)
+
+notnanmask = ~np.isnan(vidtrial)
+vidtrial = vidtrial[notnanmask].astype(int)
+vidtm_aligned = vidtm[notnanmask] - align[vidtrial]
+traj = traj[notnanmask,:,:]
+
+timemask = (vidtm_aligned>=par.tmin) & (vidtm_aligned<=par.tmax)
+vidtm_aligned = vidtm_aligned[timemask]
+vidtrial = vidtrial[timemask]
+traj = traj[timemask,:,:]
 
 # %%
-trialStart = trials_df.start_time
-trialEnd = trials_df.stop_time
-goStart = acq['BehavioralEvents']['go_start_times'].timestamps[:]
-
 
 @widgets.interact(trial=widgets.IntSlider(0, min=0, max=params.nTrials-1), step=1)
-def plotTimeSeries(trial):
-    tstart = trialStart.iloc[trial]
-    tend = trialEnd.iloc[trial]
-    ix = utils.findTimeIX([tstart, tend], vidtm)
-    ix = np.arange(ix[0], ix[1]+1)
+def plotTraj(trial):
+    a = vidtrial==trial
+    with plt.style.context('opinionated_rc'):
+        fig,ax = plt.subplots(figsize=(4,3), constrained_layout=True)
+        # plt.plot(vidtm_aligned[a],traj[a,1,0])
+        # plt.plot(vidtm_aligned[a],traj[a,1,1])
+        # plt.plot(vidtm_aligned[a],traj[a,1,2])
+        # utils.plotEventTimes(ax,params.ev)
+        # ax.set_xlabel('Time from ' + par.alignEvent + ' (s)')
+        # ax.set_ylabel('Pixels')
 
-    fig, ax = plt.subplots(2, 1, figsize=(7, 5))
-    ax[0].plot(vidtm[ix], traj[ix, 1, 0])
-    ax[0].axvline(goStart[trial], color=(0.5, 0.5, 0.5), linestyle='--')
-    ax[1].plot(traj[ix, 0, 0], traj[ix, 1, 0])
-    plt.show()
+        plt.plot(traj[a,0,0],400-traj[a,1,0])
+        plt.plot(traj[a,0,1],400-traj[a,1,1])
+        plt.plot(traj[a,0,2],400-traj[a,1,2])
+
+        plt.show()
+
 
 
 # %% PCA
@@ -415,66 +432,4 @@ for region in regions:
     # fname = 'grandAverageFiringRate_' + region
     # utils.mysavefig(fpth, fname)
     
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# UNIT LOCATIONS AND THEIR POSITIONS ON PROBE
-
-xpos = nwbfile.units['unit_posx'].data[:]
-ypos = nwbfile.units['unit_posy'].data[:]
-
-
-egroup = nwbfile.units['electrode_group'].data[:] # one entry per unit
-nUnits = len(egroup)
-electrodes_dict = []
-probe_dict = []
-for i in range(nUnits):
-    locstring = egroup[i].location
-    electrodes_dict.append( dict(eval(locstring)) )
-    electrodes_dict[i]['xpos'] = xpos[i]
-    electrodes_dict[i]['ypos'] = ypos[i]
-    
-    estring = egroup[i].description
-    probe_dict.append( dict(eval(estring)) )
-    
-electrodes_df = pd.DataFrame.from_records(electrodes_dict)
-probe_df = pd.DataFrame.from_records(probe_dict)
-
-units_df = pd.concat([electrodes_df, probe_df], axis=1)
-
-
-
-# %%
-cols = np.array([[117,221,221],
-                 [147,104,183],
-                 [231,90,124],
-                 [255,179,15],
-                 [0,0,0]]) / 255
-with plt.style.context('opinionated_rc'):
-    # groups = units_df.groupby('brain_regions')
-    groups = units_df.groupby('probe')
-    fig,ax = plt.subplots(3,2,constrained_layout=True, figsize=(7,5))
-    ax = ax.ravel()
-    ct = 0
-    for name, group in groups:
-        # if name=='right Medulla':
-        #     continue
-        ax[ct].scatter(group.xpos,group.ypos,s=1,color=cols[ct],label=name,alpha=1)
-        t = name + ', ' + np.array(group.ap_location)[0] + ' AP,' + np.array(group.ml_location)[0] + ' ML'
-        t = np.unique(group.brain_regions)[0] + ', ' + np.array(group.ap_location)[0] + ' AP,' + np.array(group.ml_location)[0] + ' ML'
-        ax[ct].set_title(t,fontsize=9,color=cols[ct])
-        ct += 1
-    for a in ax:
-        a.set_xlim([-30, 900])
-        a.tick_params(axis='both', which='major', labelsize=12)
-    # plt.scatter(xpos,ypos,s=2)
-    # ax.set_xlabel('xpos (um)')
-    # ax.set_ylabel('ypos (um)')
-    fig.supxlabel('xpos (um)',fontsize=10)
-    fig.supylabel('ypos (um)',fontsize=10)
-    plt.show()
-    
-fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
-fname = 'unit-locations-by-probe'
-utils.mysavefig(fpth,fname)
-
-# %%
 
