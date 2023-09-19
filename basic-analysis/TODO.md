@@ -9,6 +9,7 @@
 - lick raster
     - augment color based on lick dir and cond, not sure how yet tho
 - heatmap axes
+- make an ALM .obj mesh
 
 
 

@@ -52,7 +52,11 @@ else:  # Macbook Pro M2
 
 proj = "map" # subdirectory of dataDir
 
-path = '/Users/munib/Documents/Economo-Lab/code/map/meta'
+if os.name == 'nt':  # Windows PC (office)
+    path = r'/Users/munib/Documents/Economo-Lab/code/map/meta'
+else:  # Macbook Pro M2
+    # dataDir = '/Volumes/MUNIB_SSD/Economo-Lab/data/'
+    path = '/Users/munib//Economo-Lab/code/map/meta'
 fn = 'ALM_IRN_sessionMeta.csv'
 df = pd.read_csv(os.path.join(path,fn))
 
