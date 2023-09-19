@@ -52,8 +52,8 @@ else:  # Macbook Pro M2
 
 proj = "map" # subdirectory of dataDir
 
-sub = '480133' # subject/animal id
-date = '20210104' # session date
+sub = '456773' # subject/animal id
+date = '20191002' # session date
 
 par = defaultParams.getDefaultParams() 
 
