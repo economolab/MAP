@@ -44,16 +44,6 @@ _ = importlib.reload(sys.modules['defaultParams'])
 # 'par' is associated with loading and preprocessing the data
 # 'params' contains properties of the data itself (trials, units ids, etc.)
 
-par = defaultParams.getDefaultParams() 
-
-# change any default params below
-# par.regions = ['left ALM',  'left Striatum', 'right Medulla','left Midbrain']
-par.regions = ['right ALM']
-
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-# LOAD DATA
-
 if os.name == 'nt':  # Windows PC (office)
     dataDir = r'C:\Users\munib\Documents\Economo-Lab\data'
 else:  # Macbook Pro M2
@@ -65,6 +55,19 @@ proj = "map" # subdirectory of dataDir
 sub = '484677' # subject/animal id
 date = '20210418' # session date
 
+par = defaultParams.getDefaultParams() 
+
+# change any default params below
+# par.regions = ['left ALM',  'left Striatum', 'right Medulla','left Midbrain']
+par.regions = ['right ALM']
+par.regions = utils.getAllRegions(sub,date)
+
+
+# par.behav_only = 1
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# LOAD DATA
+
 nwbfile, units_df, trials_df, trialdat, psth, params = \
     utils.loadData(os.path.join(dataDir, proj),sub,date,par,behav_only=par.behav_only)
 # nwbfile - the raw data file in read only mode
@@ -73,31 +76,8 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 # psth - dict of PSTHs (psth[region] = (time,units,conditions))
 # params - session-specific params used for analyses
 
-# %% GET TRIAL AND TRIALTM FOR EACH UNIT
-tstart = np.array(trials_df.start_time)
-tend = np.array(trials_df.stop_time)
-align = utils.getBehavEventTimestamps(nwbfile,par.alignEvent)
 
-with plt.style.context('opinionated_rc'):
-    for i in range(len(nwbfile.units)):
-
-        tm = nwbfile.units[i].spike_times.item()
-        trial = utils.findTrialForEvent(tm,tstart,tend).astype(int)
-
-        trialtm = tm - align[trial]
-
-        fig,ax = plt.subplots()
-        plt.scatter(trialtm,trial,s=1)
-        utils.plotEventTimes(ax,params.ev)
-        ax.set_xlim((-2.5,2.5))
-        if i == 10:
-            break
-
-# %%
-
-# %%    
-
-# %%    
+# %%   CCF COORDINATES
 _ = importlib.reload(sys.modules['utils'])
 
 # save ccf coords of each unit/electrode to csv
@@ -143,14 +123,14 @@ utils.lickRaster(nwbfile, trials_df, par, params, cond2plot, c, labels)
 
 # fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
 # fname = 'lickRaster_hit_inactivation'
-utils.mysavefig(fpth,fname)
+# utils.mysavefig(fpth,fname)
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PLOT PSTHs
-region = 'left ALM'
-# cond2plot = [3,4]
-cond2plot = [1,2,7,8]
+region = 'left Medulla'
+cond2plot = [3,4]
+# cond2plot = [1,2,7,8]
 cols = utils.Colors()
 # c = [cols.rmiss, cols.lmiss, cols.rhit, cols.lhit] 
 c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss] 
@@ -158,7 +138,7 @@ lw = [2,2,1,1]
 labels = ['r','l','rin','lin']
 utils.plotPSTH(trialdat, region, cond2plot, c, lw, 
                    params, par, units_df, nwbfile,
-                   legend=labels, plotRaster=1,plotWave=1
+                   legend=labels, plotRaster=1,plotWave=0
                    )
 
 # fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
