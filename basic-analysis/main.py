@@ -328,7 +328,7 @@ feats = ['Camera0_side_TongueTracking',
          'Camera0_side_NoseTracking']
 
 vidtm = acq['BehavioralTimeSeries'][feats[0]].timestamps[:]
-viddt = stats.mode(np.diff(vidtm), keepdims=True)[0][0]
+viddt = stats.mode(np.diff(vidtm))[0][0]
 nFrames = len(vidtm)
 thresh = 0.95
 
@@ -362,16 +362,16 @@ def plotTraj(trial):
     a = vidtrial==trial
     with plt.style.context('opinionated_rc'):
         fig,ax = plt.subplots(figsize=(4,3), constrained_layout=True)
-        # plt.plot(vidtm_aligned[a],traj[a,1,0])
-        # plt.plot(vidtm_aligned[a],traj[a,1,1])
-        # plt.plot(vidtm_aligned[a],traj[a,1,2])
-        # utils.plotEventTimes(ax,params.ev)
-        # ax.set_xlabel('Time from ' + par.alignEvent + ' (s)')
-        # ax.set_ylabel('Pixels')
+        plt.plot(vidtm_aligned[a],traj[a,1,0])
+        plt.plot(vidtm_aligned[a],traj[a,1,1])
+        plt.plot(vidtm_aligned[a],traj[a,1,2])
+        utils.plotEventTimes(ax,params.ev)
+        ax.set_xlabel('Time from ' + par.alignEvent + ' (s)')
+        ax.set_ylabel('Pixels')
 
-        plt.plot(traj[a,0,0],400-traj[a,1,0])
-        plt.plot(traj[a,0,1],400-traj[a,1,1])
-        plt.plot(traj[a,0,2],400-traj[a,1,2])
+        # plt.plot(traj[a,0,0],400-traj[a,1,0])
+        # plt.plot(traj[a,0,1],400-traj[a,1,1])
+        # plt.plot(traj[a,0,2],400-traj[a,1,2])
 
         plt.show()
 

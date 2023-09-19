@@ -24,9 +24,9 @@ from pathlib import Path
 
 import utils
 
-# _ = importlib.reload(sys.modules['utils'])
+_ = importlib.reload(sys.modules['utils'])
+_ = importlib.reload(sys.modules['brainrender'])
 
-# %%
 
 osname = os.name
 if osname == 'nt':  # Windows PC (office)
@@ -40,8 +40,8 @@ dataDir = os.path.join(dataDir, proj)
 
 # sub = '484676' # subject/animal id
 # date = '20210420' # session date
-sub = '480133' # subject/animal id
-date = '20210104' # session date
+sub = '460432' # subject/animal id
+date = '20191220' # session date
 
 screenshots_folder = os.path.join('figs',sub,date)
 if not os.path.isdir(screenshots_folder):
@@ -63,10 +63,11 @@ if ew == 'k3d':
 reg2plot = np.unique(df.acronym)
 reg2plot = reg2plot[reg2plot!='0'] # remove 'outside brain'
 # reg2plot = ['MOs','IRN','SCm','STR']
-reg2plot = ['BLAa','CA3','SNr']
-cols = ['#33A1FD','#9448BC','#FF495C','#568259']
+# reg2plot = ['BLAa','CA3','SNr']
+reg2plot = ['MOs','IRN','GRN','MARN']
+cols = ['#9FFFCB','#00A5CF','#FF495C','#568259']
 for i in range(len(reg2plot)):
-    a = scene.add_brain_region(reg2plot[i], alpha=0.2, color=cols[i])
+    a = scene.add_brain_region(reg2plot[i], alpha=0.4, color=cols[i])
     # a = scene.add_brain_region(reg2plot[i], alpha=0.1, color='salmon')
     # # can speicfy color using hex (or a string)
     # a = scene.add_brain_region(reg2plot[i],color='#ff5733', alpha=0.15)
@@ -79,11 +80,14 @@ for i in range(len(reg2plot)):
 # Add to scene
 # plot electrodes of each probe separately (only way to color them separately)
 groups = df.groupby('probe')
+cols = ['#F1F7ED', '#FF4365', '#CA3CFF', '#FFF07C', '#D9E76C']
+c = 0
 for p,group in groups:
     coords = np.array(group.iloc[:,1:4])
     coords = coords[~np.all(coords == 0, axis=1)]
     coords2plot = utils.permute(coords,[2, 1, 0])
-    scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors="#FDCA40", radius=75))
+    scene.add(Points(coords2plot, name=np.unique(group.probe_type).item(), colors=cols[c], radius=75))
+    c+=1
 
 # scene.add(PointsDensity(coordinates))
 
@@ -99,7 +103,5 @@ if ew=='k3d':
     # plt = Plotter()
     # plt.show(*scene.renderables)
     show(*scene.renderables) 
-
-# %%
 
 # %%
