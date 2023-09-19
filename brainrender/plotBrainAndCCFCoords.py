@@ -56,7 +56,7 @@ embedWindow(ew)
 
 title = 'sub-'+sub+'_ses-'+date
 scene = Scene(title=title,atlas_name="allen_mouse_25um", inset=False, alpha=0.1,
-              screenshots_folder=screenshots_folder)
+              screenshots_folder=screenshots_folder, title_color='w')
 if ew == 'k3d': 
     scene.jupyter = True
 
