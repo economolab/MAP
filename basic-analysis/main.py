@@ -6,25 +6,26 @@ import utils
 import sys
 import importlib
 from tqdm import tqdm
-from scipy import stats
-import pandas as pd
-import nrrd
-
 from time import sleep
 import os
-from pynwb import NWBHDF5IO
-import numpy as np
 
-from ipywidgets import widgets
+from pynwb import NWBHDF5IO # working with nwb data
+import nrrd # just needed for working with allenccf annotation volumes.
+
+import numpy as np
+from scipy import stats
+import pandas as pd
+
 import matplotlib as mpl
 mpl.rcParams['font.size'] = 12
 import matplotlib.pyplot as plt
-import seaborn as sns
-import opinionated as op # https://github.com/MNoichl/opinionated 
+import seaborn as sns # for pretty plots, sometimes
+import opinionated as op # https://github.com/MNoichl/opinionated (for more pretty plots)
 # plt.style.use('dark_background')
 # plt.style.use(
 #     'https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-light.mplstyle')
-%matplotlib widget
+from ipywidgets import widgets # for interactive plots
+%matplotlib widget # for interactive plots
 
 
 
@@ -76,21 +77,9 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 # params - session-specific params used for analyses
 
 
-# %%   CCF COORDINATES
-
-# save ccf coords of each unit/electrode to csv
-csvdir = os.path.join(dataDir,proj) # where to save results
-if os.name == 'nt':  # Windows PC (office)
-    ccfdir = r'C:\Users\munib\Documents\Economo-Lab\code\map\allenccf'
-else:
-    ccfdir = '/Users/munib/Economo-Lab/code/map/allenccf'
-    
-coords_df = utils.saveCCFCoordsAndRegion(nwbfile,csvdir,ccfdir,sub,date)
-
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
 # TODO: GET KINEMATICS
-
+# most of the heavy lifting done below. just need to functionalize and get some actual kinematics.
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PERFORMANCE
