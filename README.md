@@ -23,20 +23,20 @@
 ## CONDA ENVIRONMENT
 - recommend making a new CONDA ENVIRONMENT and pip install `dandi matplotlib jupyter numpy pandas scikit-learn`
 	- you can also install `allensdk nrrd` if you want to work with the allen ccf tools (among others)
-	- and `ipympl` for interactive plots (see Comments below)
+	- and `ipywidgets` and `ipympl` for interactive plots (see Comments below)
 	
 - can use hdfview app to get overview of fields, but it's easier to look at stuff in python. couldn't get nwbviewer to install properly
 
 Comments:
-1. to get widgets to work in vs code, run:
+1. to get widgets to work in vs code, run (assuming you already have `ipywidgets`):
 	`jupyter nbextension enable --py --sys-prefix widgetsnbextension`
 2. to have interactive plots:
 	- `pip install ipympl`
 	- in your code: `%matplotlib widget` and `%matplotlib ipympl`
 		- not sure which is actually needed, but sometimes I need both?
 3. I regularly use jupyter notebooks when coding in python, the biggest pain is having to restart the kernel when you make updates to a module. I found this workaround from stackoverflow however. Just re-run the code below anytime you update a module and the updates are reflected in the current workspace/kernel without needing to restart. 
-- https://stackoverflow.com/questions/66828031/do-i-always-have-to-restart-my-kernel-in-jupyter-lab-when-code-in-a-local-module
-- `_ = importlib.reload(sys.modules['nameOfModule'])`
+	- https://stackoverflow.com/questions/66828031/do-i-always-have-to-restart-my-kernel-in-jupyter-lab-when-code-in-a-local-module
+	- `_ = importlib.reload(sys.modules['nameOfModule'])`
 4. you should have a toolbar in your plots if you use `ipywidgets` that let's you interact and hover over your plots with your cursor to look at values similar to matlab. If not, try changing the presentation to `ipywidgets`. Just click on the three dots next to the plot in the interactive vs code session, and click 'change presentation'. and then select ipywidgets. 
 
 ![toolbar](assets/toolbar.png)
