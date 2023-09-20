@@ -25,8 +25,8 @@ import opinionated as op # https://github.com/MNoichl/opinionated (for more pret
 # plt.style.use(
 #     'https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-light.mplstyle')
 from ipywidgets import widgets # for interactive plots
-%matplotlib widget # for interactive plots
-%matplotlib ipympl # suddenly i need this too?
+%matplotlib widget 
+# %matplotlib ipympl 
 
 
 
@@ -63,7 +63,7 @@ par = defaultParams.getDefaultParams()
 # par.regions = ['left ALM',  'left Striatum', 'right Medulla','left Midbrain']
 # par.regions = utils.getAllRegions(sub,date)
 # par.regions = ['MOs','IRN'] # acronyms in ccf that contain these strings
-par.regions = ['MOs'] # acronyms in ccf that contain these strings
+par.regions = ['MOs','IRN'] # acronyms in ccf that contain these strings
 
 par.behav_only = 0
 
@@ -119,7 +119,7 @@ utils.lickRaster(nwbfile, trials_df, par, params, cond2plot, c, labels)
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PLOT PSTHs
 _ = importlib.reload(sys.modules['utils'])
-region = 'MOs'
+region = 'IRN'
 cond2plot = [3,4]
 # cond2plot = [1,2,7,8]
 cols = utils.Colors()
@@ -139,37 +139,6 @@ utils.plotPSTH(trialdat, region, cond2plot, c, lw,
 # without ipywidgets (no unit slider)
 # utils.plotSinglePSTH(same args as above)
 
-# %%
-clu = 78
-fig,ax = plt.subplots()
-plt.plot(par.time,psth['IRN'][:,clu,3])
-plt.plot(par.time,psth['IRN'][:,clu,4])
-plt.show()
-
-# %%
-region = 'MOs'
-cond2plot = [3,4]
-# cond2plot = [1,2,7,8]
-cols = utils.Colors()
-# c = [cols.rmiss, cols.lmiss, cols.rhit, cols.lhit] 
-c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss] 
-lw = [2,2,1,1]
-labels = ['r','l','rin','lin']
-utils.plotSinglePSTH(26,trialdat,region,cond2plot,c,lw,
-               params,par,units_df,nwbfile,
-               legend=labels,plotRaster=1,plotWave=1)
-
-# %%
-
-
-widgUnit = widgets.IntSlider(1, min=1, max=10)    
-@widgets.interact(unit=widgUnit, step=1)
-def plott(unit):
-    fig,ax = plt.subplots()
-    ax.clear()
-    x = np.arange(1000)
-    y = np.sin(x*2*np.pi/unit)
-    ax.scatter(x,y,s=2)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # -%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

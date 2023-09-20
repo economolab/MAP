@@ -11,3 +11,5 @@
 - make an ALM .obj mesh
 
 - combine nwbfile.units.brain_region's left/right label with allenccf region
+
+- broke plotPSTH, should use params.cluid

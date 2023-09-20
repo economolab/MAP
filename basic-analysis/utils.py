@@ -721,7 +721,7 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
 
         
         for iunit in tqdm(range(nUnits)): # loop over units
-            unit = params.cluid[region][iunit] # this is just the index of units_df (could just use iunit)
+            unit = params.cluid[region][iunit] 
             for trix in range(params.nTrials): # loop over trials and alignment times
                 # get spikes in current trial
                 trialtm = units_df.trialtm.iloc[unit] # already aligned
@@ -866,45 +866,70 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
     nUnits = trialdat[region].shape[2]
     alignTimes = getBehavEventTimestamps(nwbfile,par.alignEvent)
     
+    
+    # SETUP AXES
+    if plotRaster and plotWave:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
+        iraster = 0
+        ipsth = 1
+        iwave = 2
+    elif plotRaster:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        iraster = 0
+        ipsth = 1
+    elif plotWave:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        ipsth = 0
+        iwave = 1
+    else:
+        plt.style.use('default')
+        fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
+        ipsth = 0
+        ax = [ax]
 
     # WIDGET TO EASILY LOOK AT UNITS    
     widgUnit = widgets.IntSlider(0, min=0, max=nUnits-1)    
     @widgets.interact(unit=widgUnit, step=1)
     def plotRasterAndPSTHWidget(unit):
         
-        # SETUP AXES
-        if plotRaster and plotWave:
-            plt.style.use('opinionated_rc')
-            fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
-            iraster = 0
-            ipsth = 1
-            iwave = 2
-        elif plotRaster:
-            plt.style.use('opinionated_rc')
-            fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
-            iraster = 0
-            ipsth = 1
-        elif plotWave:
-            plt.style.use('opinionated_rc')
-            fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
-            ipsth = 0
-            iwave = 1
-        else:
-            plt.style.use('default')
-            fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
-            ipsth = 0
-            ax = [ax]
+        # # SETUP AXES
+        # if plotRaster and plotWave:
+        #     plt.style.use('opinionated_rc')
+        #     fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
+        #     iraster = 0
+        #     ipsth = 1
+        #     iwave = 2
+        # elif plotRaster:
+        #     plt.style.use('opinionated_rc')
+        #     fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        #     iraster = 0
+        #     ipsth = 1
+        # elif plotWave:
+        #     plt.style.use('opinionated_rc')
+        #     fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        #     ipsth = 0
+        #     iwave = 1
+        # else:
+        #     plt.style.use('default')
+        #     fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
+        #     ipsth = 0
+        #     ax = [ax]
     
         
         [ax[i].clear() for i in range(len(ax))]
         
-        unitnum = units_df.iloc[unit].unit
+        iunit = params.cluid[region][unit]
+        unitnum = units_df.iloc[iunit].unit
+        
                 
         # PLOT RASTER
         if plotRaster:
             # get spikes
-            trialtm = units_df.iloc[unit].trialtm # already aligned
-            trial = units_df.trial.iloc[unit]
+            trialtm = units_df.iloc[iunit].trialtm # already aligned
+            trial = units_df.trial.iloc[iunit]
             # for each condition
             lasttrial = 0
             for i,cond in enumerate(cond2plot):
@@ -947,9 +972,9 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             
         # PLOT WAVE   
         if plotWave:
-            wv = units_df.iloc[unit].waveform_mean
+            wv = units_df.iloc[iunit].waveform_mean
             nSamples = len(wv)
-            x = np.arange(nSamples) / units_df.iloc[unit].sampling_rate * 1000
+            x = np.arange(nSamples) / units_df.iloc[iunit].sampling_rate * 1000
             ax[iwave].plot(x,wv,lw=3,color='k')      
             ax[iwave].set_xlabel('Time (ms)',fontsize=12)
             ax[iwave].set_ylabel('uV',fontsize=12)  
