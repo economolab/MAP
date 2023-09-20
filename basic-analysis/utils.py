@@ -333,6 +333,9 @@ def findTrialForEvent(ev, tstart, tend):
         
 # %%
 def saveCCFCoordsAndRegion(nwbfile,saveDir,ccfDir,sub,date):
+    # ccfDir is path where allenccf data already lives / will be downloaded to if doesn't exist
+    # code to get the annotation volume isn't here, I just downloaded it from:
+    # http://download.alleninstitute.org/informatics-archive/current-release/mouse_ccf/annotation/ccf_2017/
     
     # get x,y,z coords in Allen CCF space for each unit/electrode
     units = nwbfile.units

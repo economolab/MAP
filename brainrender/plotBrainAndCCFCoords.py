@@ -3,6 +3,9 @@
 # made changes to scene.py to allow for setting the 'root' alpha
 # - /Users/munib/anaconda3/envs/brainrender/lib/python3.6/site-packages/brainrender/scene.py
 
+
+# 's' for screenshot
+
 # %%
 # https://github.com/brainglobe/brainrender/blob/master/examples/notebook_workflow.ipynb
 # https://github.com/brainglobe/brainrender/blob/master/examples/add_cells.py

@@ -50,5 +50,6 @@ Comments:
 - data is assumed to be stored as on dandi (path/to/data/sub-xx/.nwbfiles)
 - I've also created a `coords.csv` file for each session I care about that holds information regarding electrode/units positions in allen ccf, and the corresponding region.
 	- you should create this file if you want to know where a unit was recorded from. 
+	- see `/basic-analysis/utils.py/saveCCFCoordsAndRegion()`
 	- you need the `allensdk` and `nrrd` packages, along with the allen annotation volume (2017, 10um) and structure map. 
 	- _Let munib know if want these to be created for you for specific sessions_ 

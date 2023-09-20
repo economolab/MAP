@@ -3,3 +3,4 @@ figs/*
 __pycache__/*
 */__pycache__/*
 **.npy
+figs/**
