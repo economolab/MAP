@@ -161,9 +161,12 @@ def loadData(dataDir,sub,date,par,behav_only=0):
     sessions = findNWB(dataDir, sub, date)
     # returns a list if more than one session provided, but this code only works for one session at the moment
     sessions = sessions[0] if len(sessions) == 1 else sessions 
-    
+
     # LOAD DATA
     nwbfile = NWBHDF5IO(os.path.join(dataDir, "sub-"+sub, sessions)).read() # load nwb file
+
+    # load coordinates
+    coords_df = loadCoordsCSV(dataDir,sub,date)
     
     # to make data easier to use gonna convert some fields to pandas dataframes
     trials_df = nwbfile.trials.to_dataframe() 
@@ -185,11 +188,10 @@ def loadData(dataDir,sub,date,par,behav_only=0):
     # GET SINGLE TRIAL FIRING RATES & PSTHs
     if not behav_only:
         units_df = nwbfile.units.to_dataframe()
-        units_df = addElectrodesInfoToUnits(units_df)
+        units_df = addElectrodesInfoToUnits(units_df, coords_df)
         # FIND CLUSTERS - subset units based on lowFR, quality, and region
         # params.cluid corresponds to units_df.iloc, not to units_df.unit
         # TODO - handle case where no cells found for a given region in par.regions
-        # TODO - should be based on allen ccf regions
         units_df, params = findClusters(units_df, par, params)
         units_df = alignSpikeTimes(nwbfile,units_df,trials_df,params,par)
         trialdat, psth = getSeq(nwbfile, par, params, units_df,trials_df)
@@ -212,6 +214,21 @@ def findNWB(dataDir,sub,date):
     sessions = [s for s in sessionList if date in s]
     sessions = [s for s in sessions if 'csv' not in s] # remove ccfcoords.csv from list
     return sessions
+
+# %%
+def loadCoordsCSV(dataDir,sub,date):
+    sessionList = os.listdir(os.path.join(dataDir,"sub-"+sub))
+    sessions = [s for s in sessionList if date in s]
+    sessions = [s for s in sessions if 'csv' in s] # keep ccfcoords.csv from list
+    coordsFile = sessions[0] if len(sessions) == 1 else sessions 
+
+    if len(coordsFile) == 0:
+        df = []
+        print('No coordinates csv file found, using unregistered brain regions')
+    else:
+        df = pd.read_csv(os.path.join(dataDir,'sub-'+sub,coordsFile))
+
+    return df
 
 # %%
 def findTrials(nwbfile,trials_df,conditions):
@@ -566,24 +583,33 @@ def lickRaster(nwbfile, trials_df, par, params, cond2plot, cols, labels):
     
 
 # %%
-def addElectrodesInfoToUnits(units_df):
+def addElectrodesInfoToUnits(units_df,coords_df):
     # units_df - nwbfile.units.to_dataframe()
-    # concatenates info stored in electrodes pynwb class to each row (unit) of the dataframe
-    # this makes it easier to subset units based on brain region
-    nUnits = units_df.shape[0]
-    electrodes_dict = []
-    probe_dict = []
-    for i in range(nUnits):
-        estring = units_df.electrode_group.iloc[i].location
-        electrodes_dict.append( dict(eval(estring)) )
+    # concatenates info stored in electrodes pynwb class if coords_df is not available
+    # else concatenates coords_df
+    # coords_df contains allenccf info about each electrode/unit
+
+    if len(coords_df) == 0:
+        nUnits = units_df.shape[0]
+        electrodes_dict = []
+        probe_dict = []
+        for i in range(nUnits):
+            estring = units_df.electrode_group.iloc[i].location
+            electrodes_dict.append( dict(eval(estring)) )
+            
+            estring = units_df.electrode_group.iloc[i].description
+            probe_dict.append( dict(eval(estring)) )
+            
+        electrodes_df = pd.DataFrame.from_records(electrodes_dict)
+        probe_df = pd.DataFrame.from_records(probe_dict)
         
-        estring = units_df.electrode_group.iloc[i].description
-        probe_dict.append( dict(eval(estring)) )
-        
-    electrodes_df = pd.DataFrame.from_records(electrodes_dict)
-    probe_df = pd.DataFrame.from_records(probe_dict)
-    
-    units_df = pd.concat([units_df, electrodes_df, probe_df], axis=1)
+        units_df = pd.concat([units_df, electrodes_df, probe_df], axis=1)
+    else:
+        units_df = pd.concat([units_df, coords_df], axis=1)
+        # rename 'acronym' column to 'brain_regions' -> already wrote code that uses brain_regions
+        units_df.columns = ['brain_regions' if x=='acronym' else x for x in units_df.columns]
+
+
     return units_df
 
 # %%
@@ -924,8 +950,8 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             ax[ipsth].set_xlim(par.tmin,par.tmax)
             ax[ipsth].grid(False)
             sns.despine(ax=ax[ipsth],offset=0,trim=False)
-            if legend:
-                op.add_legend(fontsize=10)
+            # if legend:
+            #     op.add_legend(fontsize=10)
             
         # PLOT WAVE   
         if plotWave:
@@ -940,7 +966,112 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             ax[0].set_title(f'{region} - Unit {unitnum}',fontsize=12)
         fig.canvas.toolbar_position = 'bottom'
         # ax.tick_params(direction='out', length=6, width=1)
+
+# %% plot a single unit (index 1 of psth[region])
+def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legend=None,plotRaster=0,plotWave=0):
+    
+    ## TODO - if plotting a photoinactivation condition, plot shaded region during stimulus period
+    
+    time = par.time
+    nUnits = trialdat[region].shape[2]
+    alignTimes = getBehavEventTimestamps(nwbfile,par.alignEvent)
+    
+    # SETUP AXES
+    if plotRaster and plotWave:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
+        iraster = 0
+        ipsth = 1
+        iwave = 2
+    elif plotRaster:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        iraster = 0
+        ipsth = 1
+    elif plotWave:
+        plt.style.use('opinionated_rc')
+        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+        ipsth = 0
+        iwave = 1
+    else:
+        plt.style.use('default')
+        fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
+        ipsth = 0
+        ax = [ax]
+    
+            
+    unitnum = units_df.iloc[unit].unit
+    
+    # PLOT RASTER
+    if plotRaster:
+        # setup raster yaxis
+        tt = []
+        nTrialsCond = [len(params.trialid[cond]) for i,cond in enumerate(cond2plot)]
+        for i,nTrials in enumerate(nTrialsCond):
+            tt.append(np.arange(nTrials))
+        for i in range(1,len(cond2plot)):
+            tt[i] = tt[i] + tt[i-1][-1] + 1
+        # get spikes
+        tm = units_df.iloc[unit].spike_times
+        N = len(tm)
+        # for each condition
+        for i,cond in enumerate(cond2plot):
+            trialtm_aligned = np.array([])
+            trial = np.array([])
+            trials = params.trialid[cond] 
+            alignT = alignTimes[trials]
+            # for each trial in condition
+            for itrial,time in enumerate(alignT):
+                tm_aligned = tm - time
+                # Keep only spike times in a given time window around the stimulus onset
+                tm_aligned_trial = tm_aligned[
+                    (par.tmin < tm_aligned) & (tm_aligned < par.tmax)
+                ]
+                trialtm_aligned = np.hstack((trialtm_aligned,tm_aligned_trial)) #.append(tm_aligned_trial)
+                trial = np.hstack((trial,[tt[i][itrial]]*len(tm_aligned_trial)))#.append([itrial]*len(tm_aligned_trial))
+
+            ax[iraster].scatter(trialtm_aligned, trial, s=0.3, color=cols[i])
+            ax[iraster].get_xaxis().set_ticklabels([])
+            ax[iraster].set_xlim(par.tmin,par.tmax)
+            ax[iraster].set_ylabel('Trials',fontsize=12)
+            plotEventTimes(ax[iraster],params.ev)
+    
+    # PLOT PSTH
+    for i,cond in enumerate(cond2plot):
         
+        t = params.trialid[cond]
+        dat = trialdat[region][:,t,unit]
+        mu = np.mean(dat,axis=1) # mean across trials in condition
+        sem = np.std(dat,axis=1) / np.sqrt(len(t)) # std err of mean across trials in condition
+        if legend: 
+            leg = legend[i]
+        else:
+            leg = '_nolegend_'
+        ax[ipsth].plot(par.time,mu,color=cols[i],lw=lw[i], label=leg)
+        ax[ipsth].fill_between(par.time, (mu-sem), (mu+sem), 
+                        color=cols[i], alpha=0.2,ec='none', label='_nolegend_')
+        plotEventTimes(ax[ipsth],params.ev)
+        ax[ipsth].set_xlabel(f'Time from {par.alignEvent} (s)',fontsize=12)
+        ax[ipsth].set_ylabel('Firing rate (spks/s)',fontsize=12)
+        ax[ipsth].set_xlim(par.tmin,par.tmax)
+        ax[ipsth].grid(False)
+        sns.despine(ax=ax[ipsth],offset=0,trim=False)
+        # if legend:
+        #     op.add_legend(fontsize=10)
+        
+    # PLOT WAVE   
+    if plotWave:
+        wv = units_df.iloc[unit].waveform_mean
+        nSamples = len(wv)
+        x = np.arange(nSamples) / units_df.iloc[unit].sampling_rate * 1000
+        ax[iwave].plot(x,wv,lw=3,color='k')      
+        ax[iwave].set_xlabel('Time (ms)',fontsize=12)
+        ax[iwave].set_ylabel('uV',fontsize=12)  
+            
+    with plt.style.context('default'):
+        ax[0].set_title(f'{region} - Unit {unitnum}',fontsize=12)
+    fig.canvas.toolbar_position = 'bottom'
+    # ax.tick_params(direction='out', length=6, width=1)
         
 # %% two functions in this cell are used in plotting heatmaps (see selectivity_heatmap())
 def conv_index_to_bins(index):
