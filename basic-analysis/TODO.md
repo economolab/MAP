@@ -11,5 +11,4 @@
 - heatmap axes
 - make an ALM .obj mesh
 
-- load coords.csv, add data to units_df, use it based on par.regions
-
+- use units_df.trialtm for plotPSTH

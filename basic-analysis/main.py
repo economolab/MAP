@@ -25,7 +25,7 @@ import opinionated as op # https://github.com/MNoichl/opinionated (for more pret
 # plt.style.use(
 #     'https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-light.mplstyle')
 from ipywidgets import widgets # for interactive plots
-%matplotlib widget # for interactive plots
+# %matplotlib widget # for interactive plots
 
 
 
@@ -60,10 +60,11 @@ par = defaultParams.getDefaultParams()
 
 # change any default params below
 # par.regions = ['left ALM',  'left Striatum', 'right Medulla','left Midbrain']
-par.regions = ['right ALM']
-par.regions = utils.getAllRegions(sub,date)
+# par.regions = utils.getAllRegions(sub,date)
+# par.regions = ['MOs','IRN'] # acronyms in ccf that contain these strings
+par.regions = ['MOs'] # acronyms in ccf that contain these strings
 
-par.behav_only = 1
+par.behav_only = 0
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # LOAD DATA
@@ -102,8 +103,8 @@ perf = utils.taskPerformance(trials_df, params.trialid, cond2use, c, labels, plo
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # LICK RASTER
-_ = importlib.reload(sys.modules['utils'])
-cond2plot = [3,4,7,8]
+# cond2plot = [3,4,7,8]
+cond2plot = [3,4]
 cols = utils.Colors()
 c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss]
 labels = ['R','L','Rin','Lin']
@@ -116,7 +117,7 @@ utils.lickRaster(nwbfile, trials_df, par, params, cond2plot, c, labels)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PLOT PSTHs
-region = 'left Medulla'
+region = 'MOs'
 cond2plot = [3,4]
 # cond2plot = [1,2,7,8]
 cols = utils.Colors()
@@ -126,13 +127,32 @@ lw = [2,2,1,1]
 labels = ['r','l','rin','lin']
 utils.plotPSTH(trialdat, region, cond2plot, c, lw, 
                    params, par, units_df, nwbfile,
-                   legend=labels, plotRaster=1,plotWave=0
+                   legend=labels, plotRaster=1,plotWave=1
                    )
 
 # fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
-# fname = plt.gcf().axes[0].get_title() + '_inactivation'
+# fname = plt.gcf().axes[0].get_title()
 # utils.mysavefig(fpth,fname)
 
+# %%
+clu = 78
+fig,ax = plt.subplots()
+plt.plot(par.time,psth['IRN'][:,clu,3])
+plt.plot(par.time,psth['IRN'][:,clu,4])
+plt.show()
+
+# %%
+region = 'IRN'
+cond2plot = [3,4]
+# cond2plot = [1,2,7,8]
+cols = utils.Colors()
+# c = [cols.rmiss, cols.lmiss, cols.rhit, cols.lhit] 
+c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss] 
+lw = [2,2,1,1]
+labels = ['r','l','rin','lin']
+utils.plotSinglePSTH(20,trialdat,region,cond2plot,c,lw,
+               params,par,units_df,nwbfile,
+               legend=labels,plotRaster=1,plotWave=1)
 
 
 
