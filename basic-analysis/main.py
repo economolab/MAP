@@ -25,7 +25,8 @@ import opinionated as op # https://github.com/MNoichl/opinionated (for more pret
 # plt.style.use(
 #     'https://github.com/dhaitz/matplotlib-stylesheets/raw/master/pitayasmoothie-light.mplstyle')
 from ipywidgets import widgets # for interactive plots
-# %matplotlib widget # for interactive plots
+%matplotlib widget # for interactive plots
+%matplotlib ipympl # suddenly i need this too?
 
 
 
@@ -117,6 +118,7 @@ utils.lickRaster(nwbfile, trials_df, par, params, cond2plot, c, labels)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PLOT PSTHs
+_ = importlib.reload(sys.modules['utils'])
 region = 'MOs'
 cond2plot = [3,4]
 # cond2plot = [1,2,7,8]
@@ -124,15 +126,18 @@ cols = utils.Colors()
 # c = [cols.rmiss, cols.lmiss, cols.rhit, cols.lhit] 
 c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss] 
 lw = [2,2,1,1]
-labels = ['r','l','rin','lin']
+# labels = ['r','l','rin','lin']
+labels = ['r','l']
 utils.plotPSTH(trialdat, region, cond2plot, c, lw, 
                    params, par, units_df, nwbfile,
-                   legend=labels, plotRaster=1,plotWave=1
-                   )
+                   legend=labels, plotRaster=1,plotWave=1,buffer=0)
 
 # fpth = os.path.join(r'C:\Users\munib\Documents\Economo-Lab\code\map-ephys\figs',sub,date)
 # fname = plt.gcf().axes[0].get_title()
 # utils.mysavefig(fpth,fname)
+
+# without ipywidgets (no unit slider)
+# utils.plotSinglePSTH(same args as above)
 
 # %%
 clu = 78
@@ -142,7 +147,7 @@ plt.plot(par.time,psth['IRN'][:,clu,4])
 plt.show()
 
 # %%
-region = 'IRN'
+region = 'MOs'
 cond2plot = [3,4]
 # cond2plot = [1,2,7,8]
 cols = utils.Colors()
@@ -150,11 +155,21 @@ cols = utils.Colors()
 c = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss] 
 lw = [2,2,1,1]
 labels = ['r','l','rin','lin']
-utils.plotSinglePSTH(20,trialdat,region,cond2plot,c,lw,
+utils.plotSinglePSTH(26,trialdat,region,cond2plot,c,lw,
                params,par,units_df,nwbfile,
                legend=labels,plotRaster=1,plotWave=1)
 
+# %%
 
+
+widgUnit = widgets.IntSlider(1, min=1, max=10)    
+@widgets.interact(unit=widgUnit, step=1)
+def plott(unit):
+    fig,ax = plt.subplots()
+    ax.clear()
+    x = np.arange(1000)
+    y = np.sin(x*2*np.pi/unit)
+    ax.scatter(x,y,s=2)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # -%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

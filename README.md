@@ -32,10 +32,17 @@ Comments:
 	`jupyter nbextension enable --py --sys-prefix widgetsnbextension`
 2. to have interactive plots:
 	- `pip install ipympl`
-	- in your code: `%matplotlib widget`
+	- in your code: `%matplotlib widget` and `%matplotlib ipympl`
+		- not sure which is actually needed, but sometimes I need both?
 3. I regularly use jupyter notebooks when coding in python, the biggest pain is having to restart the kernel when you make updates to a module. I found this workaround from stackoverflow however. Just re-run the code below anytime you update a module and the updates are reflected in the current workspace/kernel without needing to restart. 
 - https://stackoverflow.com/questions/66828031/do-i-always-have-to-restart-my-kernel-in-jupyter-lab-when-code-in-a-local-module
 - `_ = importlib.reload(sys.modules['nameOfModule'])`
+4. you should have a toolbar in your plots if you use `ipywidgets` that let's you interact and hover over your plots with your cursor to look at values similar to matlab. If not, try changing the presentation to `ipywidgets`. Just click on the three dots next to the plot in the interactive vs code session, and click 'change presentation'. and then select ipywidgets. 
+
+![toolbar](assets/toolbar.png)
+![changepres](assets/changepres.png)
+![ipywidget](assets/ipywidget.png)
+
 
 ## Getting started with analysis
 - see `main.py` in `/basic-analysis`

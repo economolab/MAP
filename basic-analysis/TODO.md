@@ -11,4 +11,4 @@
 - heatmap axes
 - make an ALM .obj mesh
 
-- use units_df.trialtm for plotPSTH
+- combine nwbfile.units.brain_region's left/right label with allenccf region

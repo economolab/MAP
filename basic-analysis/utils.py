@@ -605,7 +605,7 @@ def addElectrodesInfoToUnits(units_df,coords_df):
         
         units_df = pd.concat([units_df, electrodes_df, probe_df], axis=1)
     else:
-        units_df = pd.concat([units_df, coords_df], axis=1)
+        units_df = pd.concat([units_df, coords_df.iloc[:,1::]], axis=1)
         # rename 'acronym' column to 'brain_regions' -> already wrote code that uses brain_regions
         units_df.columns = ['brain_regions' if x=='acronym' else x for x in units_df.columns]
 
@@ -855,36 +855,13 @@ def mysavefig(fpth,fname,dpi=300,format='png'):
     plt.savefig(os.path.join(fpth,fname)+'.'+format, dpi=dpi, format=format)
     
 # %%
-def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legend=None,plotRaster=0,plotWave=0):
-    
+def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legend=None,plotRaster=0,plotWave=0,buffer=10):
+    # buffer = how many 'trials' in between conditions in raster plot
     ## TODO - if plotting a photoinactivation condition, plot shaded region during stimulus period
     
     time = par.time
     nUnits = trialdat[region].shape[2]
     alignTimes = getBehavEventTimestamps(nwbfile,par.alignEvent)
-    
-    # SETUP AXES
-    if plotRaster and plotWave:
-        plt.style.use('opinionated_rc')
-        fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
-        iraster = 0
-        ipsth = 1
-        iwave = 2
-    elif plotRaster:
-        plt.style.use('opinionated_rc')
-        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
-        iraster = 0
-        ipsth = 1
-    elif plotWave:
-        plt.style.use('opinionated_rc')
-        fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
-        ipsth = 0
-        iwave = 1
-    else:
-        plt.style.use('default')
-        fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
-        ipsth = 0
-        ax = [ax]
     
 
     # WIDGET TO EASILY LOOK AT UNITS    
@@ -892,43 +869,53 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
     @widgets.interact(unit=widgUnit, step=1)
     def plotRasterAndPSTHWidget(unit):
         
+        # SETUP AXES
+        if plotRaster and plotWave:
+            plt.style.use('opinionated_rc')
+            fig, ax = plt.subplots(3,1, constrained_layout=True, figsize=(4,5),  gridspec_kw={'height_ratios': [1.5, 1.5, 1]})
+            iraster = 0
+            ipsth = 1
+            iwave = 2
+        elif plotRaster:
+            plt.style.use('opinionated_rc')
+            fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+            iraster = 0
+            ipsth = 1
+        elif plotWave:
+            plt.style.use('opinionated_rc')
+            fig, ax = plt.subplots(2,1, constrained_layout=True, figsize=(4,4))
+            ipsth = 0
+            iwave = 1
+        else:
+            plt.style.use('default')
+            fig, ax = plt.subplots(constrained_layout=True, figsize=(3,2))
+            ipsth = 0
+            ax = [ax]
+    
+        
         [ax[i].clear() for i in range(len(ax))]
         
         unitnum = units_df.iloc[unit].unit
-        
+                
         # PLOT RASTER
         if plotRaster:
-            # setup raster yaxis
-            tt = []
-            nTrialsCond = [len(params.trialid[cond]) for i,cond in enumerate(cond2plot)]
-            for i,nTrials in enumerate(nTrialsCond):
-                tt.append(np.arange(nTrials))
-            for i in range(1,len(cond2plot)):
-                tt[i] = tt[i] + tt[i-1][-1] + 1
             # get spikes
-            tm = units_df.iloc[unit].spike_times
-            N = len(tm)
+            trialtm = units_df.iloc[unit].trialtm # already aligned
+            trial = units_df.trial.iloc[unit]
             # for each condition
+            lasttrial = 0
             for i,cond in enumerate(cond2plot):
-                trialtm_aligned = np.array([])
-                trial = np.array([])
                 trials = params.trialid[cond] 
-                alignT = alignTimes[trials]
-                # for each trial in condition
-                for itrial,time in enumerate(alignT):
-                    tm_aligned = tm - time
-                    # Keep only spike times in a given time window around the stimulus onset
-                    tm_aligned_trial = tm_aligned[
-                        (par.tmin < tm_aligned) & (tm_aligned < par.tmax)
-                    ]
-                    trialtm_aligned = np.hstack((trialtm_aligned,tm_aligned_trial)) #.append(tm_aligned_trial)
-                    trial = np.hstack((trial,[tt[i][itrial]]*len(tm_aligned_trial)))#.append([itrial]*len(tm_aligned_trial))
-
-                ax[iraster].scatter(trialtm_aligned, trial, s=0.3, color=cols[i])
+                spkmask = np.isin(trial,trials)
+                spks2plot = trialtm[spkmask]
+                trials2plot = renum(trial[spkmask]) + lasttrial + buffer
+                lasttrial = trials2plot[-1] + 1
+                ax[iraster].scatter(spks2plot, trials2plot, s=0.3, color=cols[i])
                 ax[iraster].get_xaxis().set_ticklabels([])
                 ax[iraster].set_xlim(par.tmin,par.tmax)
                 ax[iraster].set_ylabel('Trials',fontsize=12)
-                plotEventTimes(ax[iraster],params.ev)
+                
+            plotEventTimes(ax[iraster],params.ev)
         
         # PLOT PSTH
         for i,cond in enumerate(cond2plot):
@@ -942,16 +929,18 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
             else:
                 leg = '_nolegend_'
             ax[ipsth].plot(par.time,mu,color=cols[i],lw=lw[i], label=leg)
+            # ax[ipsth].fill_between(par.time, (mu-sem), (mu+sem), 
+            #                 color=cols[i], alpha=0.2,ec='none', label='_nolegend_')
             ax[ipsth].fill_between(par.time, (mu-sem), (mu+sem), 
-                            color=cols[i], alpha=0.2,ec='none', label='_nolegend_')
-            plotEventTimes(ax[ipsth],params.ev)
+                            color=cols[i], alpha=0.2,ec='none', label=leg)
             ax[ipsth].set_xlabel(f'Time from {par.alignEvent} (s)',fontsize=12)
             ax[ipsth].set_ylabel('Firing rate (spks/s)',fontsize=12)
             ax[ipsth].set_xlim(par.tmin,par.tmax)
             ax[ipsth].grid(False)
             sns.despine(ax=ax[ipsth],offset=0,trim=False)
             # if legend:
-            #     op.add_legend(fontsize=10)
+            #     op.add_legend(fontsize=10) # NOT WORKING ANYMORE? TODO
+        plotEventTimes(ax[ipsth],params.ev)
             
         # PLOT WAVE   
         if plotWave:
@@ -968,8 +957,8 @@ def plotPSTH(trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legen
         # ax.tick_params(direction='out', length=6, width=1)
 
 # %% plot a single unit (index 1 of psth[region])
-def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legend=None,plotRaster=0,plotWave=0):
-    
+def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nwbfile,legend=None,plotRaster=0,plotWave=0,buffer=10):
+    # same as plotPSTH, but without unit slider, so you can look at stuff without setting that up if you don't want o
     ## TODO - if plotting a photoinactivation condition, plot shaded region during stimulus period
     
     time = par.time
@@ -1004,37 +993,23 @@ def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nw
     
     # PLOT RASTER
     if plotRaster:
-        # setup raster yaxis
-        tt = []
-        nTrialsCond = [len(params.trialid[cond]) for i,cond in enumerate(cond2plot)]
-        for i,nTrials in enumerate(nTrialsCond):
-            tt.append(np.arange(nTrials))
-        for i in range(1,len(cond2plot)):
-            tt[i] = tt[i] + tt[i-1][-1] + 1
         # get spikes
-        tm = units_df.iloc[unit].spike_times
-        N = len(tm)
+        trialtm = units_df.iloc[unit].trialtm # already aligned
+        trial = units_df.trial.iloc[unit]
         # for each condition
+        lasttrial = 0
         for i,cond in enumerate(cond2plot):
-            trialtm_aligned = np.array([])
-            trial = np.array([])
             trials = params.trialid[cond] 
-            alignT = alignTimes[trials]
-            # for each trial in condition
-            for itrial,time in enumerate(alignT):
-                tm_aligned = tm - time
-                # Keep only spike times in a given time window around the stimulus onset
-                tm_aligned_trial = tm_aligned[
-                    (par.tmin < tm_aligned) & (tm_aligned < par.tmax)
-                ]
-                trialtm_aligned = np.hstack((trialtm_aligned,tm_aligned_trial)) #.append(tm_aligned_trial)
-                trial = np.hstack((trial,[tt[i][itrial]]*len(tm_aligned_trial)))#.append([itrial]*len(tm_aligned_trial))
-
-            ax[iraster].scatter(trialtm_aligned, trial, s=0.3, color=cols[i])
+            spkmask = np.isin(trial,trials)
+            spks2plot = trialtm[spkmask]
+            trials2plot = renum(trial[spkmask]) + lasttrial + buffer
+            lasttrial = trials2plot[-1] + 1
+            ax[iraster].scatter(spks2plot, trials2plot, s=0.3, color=cols[i])
             ax[iraster].get_xaxis().set_ticklabels([])
             ax[iraster].set_xlim(par.tmin,par.tmax)
             ax[iraster].set_ylabel('Trials',fontsize=12)
-            plotEventTimes(ax[iraster],params.ev)
+            
+        plotEventTimes(ax[iraster],params.ev)
     
     # PLOT PSTH
     for i,cond in enumerate(cond2plot):
@@ -1056,8 +1031,8 @@ def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nw
         ax[ipsth].set_xlim(par.tmin,par.tmax)
         ax[ipsth].grid(False)
         sns.despine(ax=ax[ipsth],offset=0,trim=False)
-        # if legend:
-        #     op.add_legend(fontsize=10)
+        if legend:
+            op.add_legend(fontsize=10)
         
     # PLOT WAVE   
     if plotWave:
