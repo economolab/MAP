@@ -1,11 +1,12 @@
 from scipy import stats
 from scipy.signal.windows import gaussian
+from scipy.interpolate import interp1d
+
 import os
 from pynwb import NWBHDF5IO
 import numpy as np
 import pandas as pd
 import re
-
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -747,6 +748,139 @@ def getSeq(nwbfile,par,params,units_df,trials_df):
                 
     return trialdat,psth
 
+# %%
+def getBehavorialTimeSeries(nwbfile,feats,trials_df,par,thresh=0.95):
+    # returns:
+    # vidtm is video timestamp within trial
+    # vidtrial is the trial each video timestamp is from 
+    # traj is (time,coords,feature) -> (time,[x,y],[tongue,jaw,nose])
+    # can get a trial's worth of data like:
+    #   trialmask = vidtrial==0; vidtm0=vidtm[trialmask]; traj0=traj[trialmask,:,:]
+    acq = nwbfile.acquisition
+
+    vidtm = acq['BehavioralTimeSeries'][feats[0]].timestamps[:]
+    # viddt = stats.mode(np.diff(vidtm)).mode[0]
+    nFrames = len(vidtm)
+
+    traj = np.zeros((nFrames, 2, len(feats))) # (time,coord,feats)
+    for i, feat in enumerate(feats):
+        temp = acq['BehavioralTimeSeries'][feat].data[:][:, 0:2]
+        proba = acq['BehavioralTimeSeries'][feat].data[:][:, 2]
+        temp[proba < thresh, :] = np.nan
+        traj[:, :, i] = temp
+
+    # find which trial each timestamp in vidtm belongs to
+    tstart = np.array(trials_df.start_time)
+    tend = np.array(trials_df.stop_time)
+    align = getBehavEventTimestamps(nwbfile,par.alignEvent)
+    vidtrial = findTrialForEvent(vidtm,tstart,tend)
+    
+    # there are timestamps that don't correspond to a trial, these 
+    # are probably during the ITI.
+    # we'll remove these from the data
+    notnanmask = ~np.isnan(vidtrial)
+    vidtrial = vidtrial[notnanmask].astype(int)
+    vidtm_aligned = vidtm[notnanmask] - align[vidtrial] # also aligning vidtm
+    traj = traj[notnanmask,:,:]
+
+    # now we have the proper data, but just want to keep tmin to tmax within each trial
+    timemask = (vidtm_aligned>=par.tmin) & (vidtm_aligned<=par.tmax)
+    vidtm_aligned = vidtm_aligned[timemask]
+    vidtrial = vidtrial[timemask]
+    traj = traj[timemask,:,:]
+    
+    return vidtm_aligned,vidtrial,traj
+
+
+def getFeatures(nwbfile,feats):
+    # # get features to use in getTrajectories() given
+    # feats = ['tongue','jaw','nose','etc']
+    # and actual features are ['Cam*Jaw',etc]
+    # and allfeats is just all those ['Cam*jaw,] features
+    allfeats = list(nwbfile.acquisition['BehavioralTimeSeries'].time_series.keys())
+    allfeats_lower = [f.lower() for f in allfeats]
+    featmask = [i for i,x in enumerate(allfeats_lower) if any(x in y or y in x for y in feats)]
+    newfeats = [allfeats[i] for i in featmask]
+    newfeats_lower = [f.lower() for f in newfeats]
+    # match newfeats to ordering in feats
+    # featmask = [i for i,x in enumerate(newfeats) if any(x in y or y in x for y in feats)]
+    
+    ix = []
+    for i in range(len(feats)):
+        for j in range(len(newfeats_lower)):
+            if feats[i] in newfeats_lower[j]:
+                ix.append(j)
+
+    feats = [newfeats[i] for i in ix]
+
+    return feats,allfeats
+
+# %%
+def getTrajectories(nwbfile,feats,trials_df,par,params,thresh=0.95):
+    # returns class traj
+    # traj.ts is size (time,trials,coord,feat)
+    # time axis is same as neural activity (tmin:dt:tmax)
+    # traj.leg = feat and corresponds to feat axis in traj.ts
+    
+    outfeats,allfeats = getFeatures(nwbfile,feats)
+        
+    
+    # get trajectories and with aligned video time and corresponding trials
+    vidtm,vidtrial,traj = getBehavorialTimeSeries(nwbfile,outfeats,trials_df,par)
+    
+    traj_interp = np.nan * np.zeros(
+        (len(par.time),params.nTrials,traj.shape[1],traj.shape[2])) # (time,trials,coord,feat)
+    # for each trial
+    for trix in range(params.nTrials):
+        # get trial data
+        mask = vidtrial == trix
+        t = vidtrial[mask]
+        ft = vidtm[mask]
+        ts = traj[mask,:,:]
+        
+        # for each feature
+        for ifeat in range(ts.shape[2]):
+            traj_interp[:,trix,:,ifeat] = \
+                interp1d(ft, ts[:,:,ifeat],axis=0,fill_value='extrapolate')(par.time)
+                
+        # find where trial starts, if it's before par.tmin, then need to fill nans before interp1d
+        firstframetime = ft[0] # last frame time for current trial
+        if firstframetime > par.tmin:
+            firstframeix_interptime = findTimeIX([firstframetime],par.time)[0]
+            traj_interp[0:firstframeix_interptime,trix,:,:] = np.nan
+        
+        # find where trial ends, if it's before par.tmax, then need to fill nans after interp1d
+        lastframetime = ft[-1] # last frame time for current trial
+        if lastframetime < par.tmax:
+            lastframeix_interptime = findTimeIX([lastframetime],par.time)[0]
+            traj_interp[lastframeix_interptime::,trix,:,:] = np.nan
+
+    traj = Dict2Class(dict())
+    traj.ts = traj_interp
+    traj.leg = feats # corresponds to last dimension of ts
+            
+    return traj
+
+# %%
+def getKinematics(traj,feats):
+    # returns class 'kin'
+    # kin.ts = (time,trials,coord,feat)
+    # kin.leg corresponds to feat axis
+    pos = traj.ts # (time,trials,coord,feat)
+    vel = np.gradient(pos,axis=0)
+
+    kin = Dict2Class(dict())
+    kin.ts = np.concatenate((pos,vel),axis=3) #(time,trials,coord,feat)
+    kin.leg = [f+'_pos' for f in feats] + [f+'_vel' for f in feats]
+    return kin
+
+# %%
+def getTrajAndKin(nwbfile,feats,trials_df,par,params,thresh=0.95):
+    # threshold is for dlc likelihood
+    traj = getTrajectories(nwbfile,feats,trials_df,par,params)
+    kin = getKinematics(traj,feats)
+    return traj,kin
+
 # %% SELECTIVITY AND CODING DIRECTIONS
 #####################################################################################################
 #####################################################################################################
@@ -1075,44 +1209,25 @@ def plotSinglePSTH(unit,trialdat,region,cond2plot,cols,lw,params,par,units_df,nw
         ax[0].set_title(f'{region} - Unit {unitnum}',fontsize=12)
     fig.canvas.toolbar_position = 'bottom'
     # ax.tick_params(direction='out', length=6, width=1)
+
+# %%
+def plotSingleTrialTrajectories(time,traj,params,par,coords2plot,feats2plot):
+    fig,ax = plt.subplots(figsize=(4,3), constrained_layout=True)
+    @widgets.interact(trial=widgets.IntSlider(0, min=0, max=params.nTrials-1), step=1)
+    def plotTraj(trial):
+        ax.clear()
+        with plt.style.context('opinionated_rc'):
+            for i in range(len(feats2plot)):
+                ax.plot(time,traj[:,trial,coords2plot,feats2plot[i]])
+            # ax.plot(time,traj[:,trial,coords2plot,1])
+            # ax.plot(time,traj[:,trial,coords2plot,2])
+
+            plotEventTimes(ax,params.ev)
+            ax.set_xlabel('Time from ' + par.alignEvent + ' (s)')
+            ax.set_ylabel('Pixel')
+            ax.set_xlim((par.tmin,par.tmax))
+            sns.despine(ax=ax,offset=0,trim=False)
         
-# %% two functions in this cell are used in plotting heatmaps (see selectivity_heatmap())
-def conv_index_to_bins(index):
-    """Calculate bins to contain the index values.
-    The start and end bin boundaries are linearly extrapolated from 
-    the two first and last values. The middle bin boundaries are 
-    midpoints.
-
-    Example 1: [0, 1] -> [-0.5, 0.5, 1.5]
-    Example 2: [0, 1, 4] -> [-0.5, 0.5, 2.5, 5.5]
-    Example 3: [4, 1, 0] -> [5.5, 2.5, 0.5, -0.5]"""
-    assert index.is_monotonic_increasing or index.is_monotonic_decreasing
-
-    # the beginning and end values are guessed from first and last two
-    start = index[0] - (index[1]-index[0])/2
-    end = index[-1] + (index[-1]-index[-2])/2
-
-    # the middle values are the midpoints
-    middle = pd.DataFrame({'m1': index[:-1], 'p1': index[1:]})
-    middle = middle['m1'] + (middle['p1']-middle['m1'])/2
-
-    idx = pd.Index(middle,dtype='float64').union([start,end])
-    # if isinstance(index, pd.DatetimeIndex):
-    #     idx = pd.DatetimeIndex(middle).union([start,end])
-    # elif isinstance(index, (pd.Float64Index,pd.RangeIndex,pd.Int64Index)):
-    #     idx = pd.Index(middle,dtype='float64').union([start,end])
-    # else:
-    #     print('Warning: guessing what to do with index type %s' % 
-    #         type(index))
-    #     idx = pd.Float64Index(middle).union([start,end])
-
-    return idx.sort_values(ascending=index.is_monotonic_increasing)
-
-def calc_df_mesh(df):
-    """Calculate the two-dimensional bins to hold the index and 
-    column values."""
-    return np.meshgrid(conv_index_to_bins(df.index), conv_index_to_bins(df.columns))
-
 
 # %%
 def selectivity_heatmap(dat,params,rows,cols,xlim,ylim,cmap='coolwarm',vline=1,hline=1):
@@ -1141,7 +1256,71 @@ def selectivity_heatmap(dat,params,rows,cols,xlim,ylim,cmap='coolwarm',vline=1,h
     plt.show()
 
 # %%
-def plotEventTimes(ax,paramsev):
+def plotEventTimes(ax,paramsev,color=(0,0,0),lw=2):
     # paramsev == params.ev
     for ev,evtm in paramsev.items(): # indicate epochs with vertical dashed lines
-            ax.axvline(evtm, color=(0,0,0), linestyle=(0, (1, 1)),linewidth=2.5)
+            ax.axvline(evtm, color=color, linestyle=(0, (1, 1)),linewidth=lw)
+
+
+# %%
+def plotKin(p,par,params,buffer=1):
+    # buffer is spacing between trials when 'stacked'
+
+    # get index of feature to plot
+    ifeat = [i for i,f in enumerate(p.dat.leg) if p.feat in f][0]
+
+    if p.style=='stacked':
+        with plt.style.context('opinionated_rc'):
+            fig,ax = plt.subplots(figsize=(4,8),constrained_layout=True)
+            ct = 0
+            for i,cond in enumerate(p.cond2plot):
+                trials = params.trialid[cond]
+                for j,trix in enumerate(trials):
+                    toplot = p.dat.ts[:,trix,p.coord,ifeat]
+                    ax.plot(par.time,toplot + ct*buffer, 
+                            color=p.cols[i], alpha=p.alpha)
+                    ct += 1
+            sns.despine(fig,ax,offset=0,trim=False)
+            plotEventTimes(ax,params.ev)
+            ax.set_xlabel('Time from ' + par.alignEvent,fontsize=10)
+            ax.set_yticklabels('')
+            ax.set_xlim((par.tmin,par.tmax))
+            plt.title(p.feat,fontsize=10)
+            plt.show()
+    elif p.style=='heatmap':
+        with plt.style.context('opinionated_rc'):
+            fig,ax = plt.subplots(figsize=(4,5),constrained_layout=True)
+            nTrials = []
+            dat = []
+            for i,cond in enumerate(p.cond2plot):
+                trials = params.trialid[cond]
+                nTrials.append(len(trials))
+                dat.append(p.dat.ts[:,trials,p.coord,ifeat])
+            alldat = dat[0]
+            for i in range(1,len(dat)):
+                alldat = np.concatenate((alldat,dat[i]),axis=1)
+            
+            # converting data to dataframe and setting index to time.
+            #  This is the only way I've figured out so far to get the time axis in 
+            # a heatmap to be somewhat nice. 
+            df = pd.DataFrame(alldat, index=np.round(par.time,1))
+            hm = sns.heatmap(df.T,ax=ax,cmap='viridis',cbar=True)
+            hm.set_facecolor('black') # nans are not visible, so set a background color for nans
+            ax.set_xlabel('Time from ' + par.alignEvent,fontsize=10)
+            ax.set_ylabel('Trials',fontsize=10)
+            ax.tick_params(axis='both', which='major', labelsize=10)
+            ax.collections[0].colorbar.ax.tick_params(labelsize=7)
+            # plot horizontal lines to mark different conditions
+            for i in range(1,len(nTrials)):
+                ax.axhline(nTrials[i], color=(1,1,1), linestyle=(0, (1, 1)),linewidth=0.75)
+            plt.title(p.feat,fontsize=10)
+            xlims = [par.tmin,par.tmax]
+            # for heatmaps, have to use index, not time, for plotting events
+            ix = findTimeIX(xlims,par.time)
+            ax.set_xlim((ix[0],ix[1]))
+            # same idea applies for the event times
+            ev = params.ev.copy()
+            for k,v in ev.items():
+                ev[k] = findTimeIX([v],par.time)[0]
+            plotEventTimes(ax,ev,color=(1,1,1),lw=1.5)
+            plt.show()

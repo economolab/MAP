@@ -80,8 +80,39 @@ nwbfile, units_df, trials_df, trialdat, psth, params = \
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-# TODO: GET KINEMATICS
-# most of the heavy lifting done below. just need to functionalize and get some actual kinematics.
+# DLC TRAJECTORIES AND KINEMATICS
+feats = ['tongue',
+         'jaw',
+         'nose']
+traj,kin = utils.getTrajAndKin(nwbfile,feats,trials_df,par,params)
+# traj is dlc positions
+# traj.ts is of size (time,trials,coord,feat)
+# traj.leg corresponds to feat axis (3)
+# kin is dlc positions + dlc velocities (need to add tongue length TODO)
+# kin.ts is of size (time,trials,coord,feat)
+# kin.leg corresponds to feat axis(3)
+
+
+# scroll through single trials
+coords2plot = [1] # [0,1] = [x,y]
+feats2plot = [0,1,2] # corresponds to feats above
+# utils.plotSingleTrialTrajectories(par.time,traj.ts,params,par,coords2plot,feats2plot)
+# utils.plotSingleTrialTrajectories(par.time,kin.ts,params,par,[1],[0,1,2])
+
+# %% PLOT KIN
+# plot a stacked plot for a given feature (or a heatmap)
+p = utils.Dict2Class(dict())
+p.feat = 'tongue_pos' # 'jaw_pos' 'jaw_vel' ...
+p.cond2plot = [1,2,7,8]
+p.coord = 1 # 0=x, 1=y
+p.dat = kin # could also use traj, just make sure p.feat corresponds to traj.leg
+
+p.style = 'heatmap' # 'stacked' or 'heatmap'
+cols = utils.Colors()
+p.cols = [cols.rhit, cols.lhit, cols.rmiss, cols.lmiss]
+p.alpha = 0.7 # for stacked plot
+    
+utils.plotKin(p,par,params,buffer=3)
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # PERFORMANCE
@@ -307,66 +338,6 @@ plt.show()
 # fname = 'pCD_' + label + '_' + reg2use[0] + 'vs' + reg2use[1]
 # utils.mysavefig(fpth,fname)
 
-
-
-
-
-# %% DLC DATA
-
-
-acq = nwbfile.acquisition
-
-feats = ['Camera0_side_TongueTracking',
-         'Camera0_side_JawTracking',
-         'Camera0_side_NoseTracking']
-
-vidtm = acq['BehavioralTimeSeries'][feats[0]].timestamps[:]
-viddt = stats.mode(np.diff(vidtm))[0][0]
-nFrames = len(vidtm)
-thresh = 0.95
-
-traj = np.zeros((nFrames, 2, len(feats))) # (time,coord,feats)
-for i, feat in enumerate(feats):
-    temp = acq['BehavioralTimeSeries'][feat].data[:][:, 0:2]
-    proba = acq['BehavioralTimeSeries'][feat].data[:][:, 2]
-    temp[proba < thresh, :] = np.nan
-    traj[:, :, i] = temp
-
-tstart = np.array(trials_df.start_time)
-tend = np.array(trials_df.stop_time)
-align = utils.getBehavEventTimestamps(nwbfile,par.alignEvent)
-
-vidtrial = utils.findTrialForEvent(vidtm,tstart,tend)
-
-notnanmask = ~np.isnan(vidtrial)
-vidtrial = vidtrial[notnanmask].astype(int)
-vidtm_aligned = vidtm[notnanmask] - align[vidtrial]
-traj = traj[notnanmask,:,:]
-
-timemask = (vidtm_aligned>=par.tmin) & (vidtm_aligned<=par.tmax)
-vidtm_aligned = vidtm_aligned[timemask]
-vidtrial = vidtrial[timemask]
-traj = traj[timemask,:,:]
-
-# %%
-
-@widgets.interact(trial=widgets.IntSlider(0, min=0, max=params.nTrials-1), step=1)
-def plotTraj(trial):
-    a = vidtrial==trial
-    with plt.style.context('opinionated_rc'):
-        fig,ax = plt.subplots(figsize=(4,3), constrained_layout=True)
-        plt.plot(vidtm_aligned[a],traj[a,1,0])
-        plt.plot(vidtm_aligned[a],traj[a,1,1])
-        plt.plot(vidtm_aligned[a],traj[a,1,2])
-        utils.plotEventTimes(ax,params.ev)
-        ax.set_xlabel('Time from ' + par.alignEvent + ' (s)')
-        ax.set_ylabel('Pixels')
-
-        # plt.plot(traj[a,0,0],400-traj[a,1,0])
-        # plt.plot(traj[a,0,1],400-traj[a,1,1])
-        # plt.plot(traj[a,0,2],400-traj[a,1,2])
-
-        plt.show()
 
 
 
