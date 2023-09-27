@@ -19,9 +19,9 @@ mpl.rcParams['font.size'] = 12
 
 from tqdm import tqdm
 
-from allensdk.core.reference_space_cache import ReferenceSpaceCache
+#from allensdk.core.reference_space_cache import ReferenceSpaceCache
 from pathlib import Path
-import nrrd
+#import nrrd
 
 
 # %% CLASSES
