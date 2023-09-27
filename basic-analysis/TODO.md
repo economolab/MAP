@@ -4,10 +4,10 @@
     - photostim_start_times.control -> ogen_sites    -> tells you the hemisphere
 - stimEpoch
     - this is just using photostim_start and end times
-- GET KINEMATICS (make it like our obj.traj) - almost done
 - lick raster
     - augment color based on lick dir and cond, not sure how yet tho
-- heatmap time axes
+- heatmap time axes are so weird, need to write custom function to plot them nicely
 - make an ALM .obj mesh
+- tongue length in getKinematics
 
 - combine nwbfile.units.brain_region's left/right label with allenccf region

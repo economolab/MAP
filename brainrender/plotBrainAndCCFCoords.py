@@ -9,6 +9,7 @@
 # %%
 # https://github.com/brainglobe/brainrender/blob/master/examples/notebook_workflow.ipynb
 # https://github.com/brainglobe/brainrender/blob/master/examples/add_cells.py
+# https://github.com/marcomusy/BrainRender/blob/master/Docs/UserGuide.md
 
 import os
 import sys
@@ -98,7 +99,7 @@ for p,group in groups:
 
 # render
 scene.content
-scene.render(zoom=1.25)
+# scene.render(zoom=1.25)
 
 
 # if ew=='k3d' - run these last two lines of code again and it'll render
@@ -107,4 +108,37 @@ if ew=='k3d':
     # plt.show(*scene.renderables)
     show(*scene.renderables) 
 
+
+# %% VIDEO - works on windows, not on mac (error in ffmpeg)
+# but how do I make it do what I want? 
+
+from brainrender.video import VideoMaker
+
+# Get a video maker
+
+vm = VideoMaker(scene, save_fld=r"C:\Users\munib\Documents\Economo-Lab\code\map", name='video')
+
+# Make a video!
+vm.make_video(elevation=2, duration=1, fps=15)
+
 # %%
+
+from brainrender.video import VideoMaker
+# Make a custom make frame function
+def make_frame(scene, frame_number, *args, **kwargs):
+    alpha = scene.root.alpha()
+    scene.root.alpha(alpha*0.95)
+
+
+# Now make a video with our custom function
+scene = Scene("my video2")
+scene.add_brain_region("TH")
+vm = VideoMaker(scene, save_fld=r"C:\Users\munib\Documents\Economo-Lab\code\map",
+                name='video',
+                make_frame_func=make_frame)
+vm.make_video(scene,duration=5, fps=20)
+
+# %% write to .obj (DOESN'T WORK)
+# from vedo import write
+
+# write(scene.actors, 'test.obj', binary=True)
