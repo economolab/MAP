@@ -2,7 +2,7 @@
 
 ## [LINK TO DATASET](https://dandiarchive.org/dandiset/000363?search=susu+chen&pos=1)
 
-## DOWNLOAD INSTRUCTIONS
+##  DOWNLOAD INSTRUCTIONS
 
 - you can download from the link above directly
 - alternatively, after pip installing `dandi` you can run the following command:
@@ -52,4 +52,5 @@ Comments:
 	- you should create this file if you want to know where a unit was recorded from. 
 	- see `/basic-analysis/utils.py/saveCCFCoordsAndRegion()`
 	- you need the `allensdk` and `nrrd` packages, along with the allen annotation volume (2017, 10um) and structure map. 
+	- might be helpful to create a new conda env for just this step since there might be package versioning issues
 	- _Let munib know if want these to be created for you for specific sessions_ 
